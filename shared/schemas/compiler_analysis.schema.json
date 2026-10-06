@@ -1,0 +1,98 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CompilerAnalysisPayload",
+  "type": "object",
+  "required": [
+    "source_code",
+    "stats",
+    "tokens",
+    "ast",
+    "symbol_table",
+    "diagnostics",
+    "intermediate_code",
+    "optimized_code",
+    "basic_blocks",
+    "cfg",
+    "metrics"
+  ],
+  "properties": {
+    "source_code": { "type": "string" },
+    "stats": {
+      "type": "object",
+      "properties": {
+        "lines": { "type": "integer" },
+        "characters": { "type": "integer" },
+        "tokens_count": { "type": "integer" },
+        "keywords_count": { "type": "integer" },
+        "identifiers_count": { "type": "integer" }
+      }
+    },
+    "tokens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "value", "line", "column"],
+        "properties": {
+          "type": { "type": "string" },
+          "value": { "type": "string" },
+          "line": { "type": "integer" },
+          "column": { "type": "integer" }
+        }
+      }
+    },
+    "ast": { "type": "object" },
+    "symbol_table": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "category": { "type": "string" },
+          "data_type": { "type": "string" },
+          "scope": { "type": "string" },
+          "line": { "type": "integer" }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "severity": { "type": "string", "enum": ["error", "warning", "info"] },
+          "phase": { "type": "string" },
+          "message": { "type": "string" },
+          "line": { "type": "integer" },
+          "column": { "type": "integer" }
+        }
+      }
+    },
+    "intermediate_code": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "op": { "type": "string" },
+          "arg1": { "type": "string" },
+          "arg2": { "type": "string" },
+          "result": { "type": "string" }
+        }
+      }
+    },
+    "optimized_code": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "basic_blocks": { "type": "array" },
+    "cfg": { "type": "object" },
+    "metrics": {
+      "type": "object",
+      "properties": {
+        "cyclomatic_complexity": { "type": "integer" },
+        "loc": { "type": "integer" },
+        "cognitive_complexity": { "type": "integer" },
+        "risk_level": { "type": "string" }
+      }
+    }
+  }
+}

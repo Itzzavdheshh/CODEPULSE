@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CodePulseArtifact",
+  "type": "object",
+  "required": ["artifact_id", "artifact_type", "schema_version", "created_at", "producer", "metadata", "payload"],
+  "properties": {
+    "artifact_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "artifact_type": {
+      "type": "string",
+      "enum": [
+        "compiler_analysis",
+        "token_stream",
+        "symbol_table",
+        "ast",
+        "semantic_analysis",
+        "intermediate_code",
+        "control_flow_graph",
+        "code_metrics",
+        "data_profile",
+        "processed_dataset",
+        "ml_model_result",
+        "ml_evaluation",
+        "ml_predictions",
+        "integrated_report"
+      ]
+    },
+    "schema_version": {
+      "type": "string",
+      "default": "1.0.0"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "type": "object",
+      "required": ["engine", "version"],
+      "properties": {
+        "engine": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "required": ["title"],
+      "properties": {
+        "title": { "type": "string" },
+        "project_name": { "type": "string" },
+        "source_file": { "type": "string" },
+        "summary": { "type": "string" }
+      }
+    },
+    "payload": {
+      "type": "object"
+    }
+  }
+}
