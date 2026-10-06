@@ -25,11 +25,10 @@ class ArtifactStore:
         artifact = {
             "artifact_id": art_id,
             "artifact_type": artifact_type,
-            "schema_version": "1.0.0",
+            "schema": artifact_type,
             "created_at": created_at,
             "producer": {
-                "engine": engine,
-                "version": "1.0.0"
+                "engine": engine
             },
             "metadata": {
                 "title": title,

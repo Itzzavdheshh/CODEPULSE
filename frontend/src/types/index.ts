@@ -148,9 +148,9 @@ export interface MLResult {
 export interface CodePulseArtifact {
   artifact_id: string;
   artifact_type: string;
-  schema_version: string;
+  schema: string;
   created_at: string;
-  producer: { engine: string; version: string };
+  producer: { engine: string };
   metadata: { title: string; source_file: string; summary: string };
   payload: any;
 }

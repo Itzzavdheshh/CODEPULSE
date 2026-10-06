@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "CodePulseArtifact",
   "type": "object",
-  "required": ["artifact_id", "artifact_type", "schema_version", "created_at", "producer", "metadata", "payload"],
+  "required": ["artifact_id", "artifact_type", "schema", "created_at", "producer", "metadata", "payload"],
   "properties": {
     "artifact_id": {
       "type": "string",
@@ -27,9 +27,8 @@
         "integrated_report"
       ]
     },
-    "schema_version": {
-      "type": "string",
-      "default": "1.0.0"
+    "schema": {
+      "type": "string"
     },
     "created_at": {
       "type": "string",
@@ -37,12 +36,9 @@
     },
     "producer": {
       "type": "object",
-      "required": ["engine", "version"],
+      "required": ["engine"],
       "properties": {
         "engine": {
-          "type": "string"
-        },
-        "version": {
           "type": "string"
         }
       }
