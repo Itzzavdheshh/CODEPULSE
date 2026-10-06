@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Any
 from .ast import (
     ASTNode, ProgramNode, ClassNode, MethodNode, BlockNode,
     VarDeclNode, AssignNode, IfNode, WhileNode, ForNode,

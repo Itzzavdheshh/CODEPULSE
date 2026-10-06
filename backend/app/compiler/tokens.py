@@ -43,5 +43,5 @@ JAVA_KEYWORDS = {
     "class", "public", "private", "protected", "static", "final",
     "void", "int", "float", "double", "boolean", "String",
     "if", "else", "while", "for", "return", "true", "false",
-    "System", "out", "println", "new", "this"
+    "new", "this"
 }

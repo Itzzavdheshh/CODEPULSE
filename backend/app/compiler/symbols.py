@@ -36,6 +36,6 @@ class SymbolTable:
             return self.parent.lookup(name)
         return None
 
-    def get_all_symbols((self)) -> List[Symbol]:
+    def get_all_symbols(self) -> List[Symbol]:
         all_syms = list(self.symbols.values())
         return all_syms

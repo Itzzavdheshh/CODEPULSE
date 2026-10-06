@@ -49,7 +49,7 @@ class IRGenerator:
         self.temp_counter = 0
         self.label_counter = 0
 
-    def new_temp(()) -> str:
+    def new_temp(self) -> str:
         self.temp_counter += 1
         return f"t{self.temp_counter}"
 

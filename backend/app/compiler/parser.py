@@ -151,6 +151,10 @@ class Parser:
             while True:
                 p_type = self.current_token().value
                 self.advance()
+                while self.current_token().value == "[" and self.peek_token().value == "]":
+                    p_type += "[]"
+                    self.advance()
+                    self.advance()
                 p_name = self.expect(TokenType.IDENTIFIER, msg="Expected parameter name").value
                 params.append({"type": p_type, "name": p_name})
                 if not self.match(TokenType.DELIMITER, ","):
