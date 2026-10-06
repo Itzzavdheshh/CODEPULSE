@@ -82,7 +82,7 @@ export const CompilerStudio: React.FC = () => {
 
           {errorMsg && (
             <div style={{ marginTop: '12px', padding: '12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#F87171', fontSize: '0.85rem' }}>
-              <AlertCircle size={16} inline style={{ marginRight: '6px' }} />
+              <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px' }} />
               {errorMsg}
             </div>
           )}
@@ -132,7 +132,7 @@ export const CompilerStudio: React.FC = () => {
                   <h4 style={{ fontSize: '0.95rem', color: '#FFF', marginBottom: '10px' }}>Diagnostics & Syntax Errors ({analysis.diagnostics.length})</h4>
                   {analysis.diagnostics.length === 0 ? (
                     <div style={{ padding: '12px', background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: '8px', color: '#34D399', fontSize: '0.85rem' }}>
-                      <CheckCircle size={16} inline style={{ marginRight: '6px' }} />
+                      <CheckCircle size={16} style={{ display: 'inline', marginRight: '6px' }} />
                       Clean compile: Zero lexical, syntax, or semantic diagnostics found!
                     </div>
                   ) : (

@@ -110,7 +110,7 @@ export const MLStudio: React.FC = () => {
 
           {errorMsg && (
             <div style={{ marginTop: '12px', padding: '12px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#F87171', fontSize: '0.85rem' }}>
-              <AlertCircle size={16} inline style={{ marginRight: '6px' }} />
+              <AlertCircle size={16} style={{ display: 'inline', marginRight: '6px' }} />
               {errorMsg}
             </div>
           )}

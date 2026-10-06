@@ -48,7 +48,7 @@ export const VisualizationsStudio: React.FC = () => {
             <BarChart3 size={18} color="#06B6D4" />
             Module Complexity & Risk Distribution
           </span>
-          <div style={{ background: '#0B0F19', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', minHeight: '300px', display: 'flex', flexDirection: 'column', justify: 'center', gap: '16px' }}>
+          <div style={{ background: '#0B0F19', padding: '24px', borderRadius: '12px', border: '1px solid var(--border-color)', minHeight: '300px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '16px' }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '4px' }}>
                 <span style={{ color: '#34D399', fontWeight: 600 }}>Low Risk (V(G) ≤ 5)</span>
