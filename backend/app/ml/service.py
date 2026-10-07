@@ -120,8 +120,8 @@ class MLService:
         instance_dict: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Enforces Credibility Rule #33 & #56: Validates Feature Schema Compatibility before prediction!
-        Stops prediction if required training features are missing.
+        Validates feature schema compatibility then runs ACTUAL sklearn model inference.
+        No hardcoded results — uses the real trained model, scaler, and encoders stored in the artifact payload.
         """
         required_features = trained_model_payload.get("features", [])
         instance_df = pd.DataFrame([instance_dict])
@@ -135,12 +135,92 @@ class MLService:
                 "missing_features": [f for f in required_features if f not in instance_df.columns]
             }
 
-        return {
-            "prediction_available": True,
-            "predicted_class": "LOW",
-            "confidence": 0.88,
-            "explanation": "Prediction processed successfully."
-        }
+        # Retrieve actual trained model and preprocessing objects from payload
+        model = trained_model_payload.get("trained_model_ref")
+        scaler = trained_model_payload.get("scaler_ref")
+        encoders = trained_model_payload.get("encoders_ref", {})
+        target_classes = trained_model_payload.get("target_classes", [])
+        task_type = trained_model_payload.get("task_type", "classification")
+
+        if model is None:
+            return {
+                "prediction_available": False,
+                "error": "Trained model reference not available in artifact. Please re-train the model to enable live predictions.",
+                "missing_features": []
+            }
+
+        try:
+            X_instance = instance_df[required_features].copy()
+
+            # Apply same categorical encoding used during training
+            for col, encoder in encoders.items():
+                if col in X_instance.columns:
+                    try:
+                        X_instance[col] = encoder.transform(X_instance[col].astype(str))
+                    except Exception:
+                        return {
+                            "prediction_available": False,
+                            "error": f"Prediction Unavailable: Feature '{col}' contains a value not seen during training (unseen label).",
+                            "missing_features": []
+                        }
+
+            X_raw = X_instance.values.astype(float)
+
+            # Apply the TRAINING-TIME scaler (no data leakage — transform only, not fit)
+            X_scaled = scaler.transform(X_raw) if scaler is not None else X_raw
+
+            # Actual model inference
+            predicted_raw = model.predict(X_scaled)[0]
+
+            # Resolve class label from target_classes list
+            if target_classes and task_type == "classification":
+                try:
+                    predicted_label = target_classes[int(predicted_raw)]
+                except (IndexError, ValueError, TypeError):
+                    predicted_label = str(predicted_raw)
+            else:
+                predicted_label = str(round(float(predicted_raw), 4)) if task_type == "regression" else str(predicted_raw)
+
+            # Probability / confidence (classification only)
+            probabilities = None
+            confidence = None
+            if hasattr(model, "predict_proba") and task_type == "classification":
+                try:
+                    proba = model.predict_proba(X_scaled)[0]
+                    probabilities = [round(float(p), 4) for p in proba]
+                    confidence = round(float(max(proba)), 4)
+                except Exception:
+                    confidence = None
+
+            # Real explainability from feature importances
+            explanation = self.explainability.explain_instance_prediction(
+                model,
+                required_features,
+                instance_dict,
+                predicted_label,
+                probabilities
+            )
+
+            return {
+                "prediction_available": True,
+                "predicted_class": predicted_label,
+                "confidence": confidence,
+                "probabilities": {
+                    str(cls): prob
+                    for cls, prob in zip(
+                        target_classes if target_classes else list(range(len(probabilities or []))),
+                        probabilities or []
+                    )
+                },
+                "explanation": explanation
+            }
+
+        except Exception as e:
+            return {
+                "prediction_available": False,
+                "error": f"Prediction engine error: {str(e)}",
+                "missing_features": []
+            }
 
     def export_ml_bundle(self, ml_artifact_payload: Dict[str, Any]) -> Dict[str, Any]:
         """

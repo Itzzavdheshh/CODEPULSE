@@ -17,7 +17,7 @@ class WorkspaceManager:
             "workspace_id": ws_id,
             "name": name,
             "description": description,
-            "created_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z"),
             "files": [],
             "datasets": [],
             "artifacts_count": 0

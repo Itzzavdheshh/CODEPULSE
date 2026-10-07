@@ -13,7 +13,7 @@ class IntegratedReportGenerator:
         ml_results: Optional[Dict[str, Any]] = None,
         title: str = "CodePulse Integrated Intelligence Report"
     ) -> Dict[str, Any]:
-        timestamp = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
         md_lines = [
             f"# {title}",

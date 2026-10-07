@@ -23,7 +23,8 @@ class ModelFactory:
                 return GaussianNB()
             elif "svm" in model_name_lower or "svc" in model_name_lower:
                 from sklearn.svm import SVC
-                return SVC(probability=True, random_state=42)
+                from sklearn.calibration import CalibratedClassifierCV
+                return CalibratedClassifierCV(SVC(random_state=42), ensemble=False)
             elif "logistic" in model_name_lower or "logistic_regression" == model_name_lower:
                 return LogisticRegression(max_iter=1000, random_state=42)
             else:

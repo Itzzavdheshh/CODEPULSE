@@ -139,6 +139,30 @@ class IRGenerator:
         self.quads.append(Quadruple("GOTO", "", "", start_label, line=node.line))
         self.quads.append(Quadruple("LABEL", "", "", end_label, line=node.line))
 
+    def visit_ForLoop(self, node) -> None:
+        """Emit TAC for: init; loop_start: if !cond goto end; body; update; goto loop_start; end:"""
+        # Emit initializer (e.g., int i = 0)
+        if node.init:
+            self.visit(node.init)
+
+        start_label = self.new_label()
+        end_label = self.new_label()
+
+        self.quads.append(Quadruple("LABEL", "", "", start_label, line=node.line))
+
+        if node.condition:
+            cond_temp = self.visit(node.condition)
+            self.quads.append(Quadruple("IF_FALSE", cond_temp, "", end_label, line=node.line))
+
+        self.visit(node.body)
+
+        # Emit update expression (e.g., i++)
+        if node.update:
+            self.visit(node.update)
+
+        self.quads.append(Quadruple("GOTO", "", "", start_label, line=node.line))
+        self.quads.append(Quadruple("LABEL", "", "", end_label, line=node.line))
+
     def visit_ReturnStatement(self, node: ReturnNode):
         val = ""
         if node.value:
