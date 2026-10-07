@@ -47,7 +47,54 @@ export function getExportUrl(artifactId: string, format: string): string {
   return `${API_BASE}/compiler/export/${artifactId}/${format}`;
 }
 
-export async function profileDataset(csvText: string, datasetName: string = 'Dataset.csv'): Promise<{ data_summary: { profile: DataProfile; preview: any[] }; artifact?: CodePulseArtifact }> {
+export async function cleanDataset(
+  csvText: string,
+  imputeStrategy: string = 'mean',
+  handleOutliers: boolean = true,
+  normalize: boolean = false
+): Promise<any> {
+  const res = await fetch(`${API_BASE}/data/clean`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      csv_text: csvText,
+      impute_strategy: imputeStrategy,
+      handle_outliers: handleOutliers,
+      normalize: normalize
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || 'Data cleaning failed.');
+  }
+  return res.json();
+}
+
+export function getDataExportZipUrl(artifactId: string): string {
+  return `${API_BASE}/data/export/${artifactId}`;
+}
+
+export function getMLExportZipUrl(artifactId: string): string {
+  return `${API_BASE}/ml/export/${artifactId}`;
+}
+
+export async function predictMLInstance(mlArtifactId: string, instanceData: Record<string, any>): Promise<any> {
+  const res = await fetch(`${API_BASE}/ml/predict`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      ml_artifact_id: mlArtifactId,
+      instance_data: instanceData
+    })
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail || 'ML prediction failed.');
+  }
+  return res.json();
+}
+
+export async function profileDataset(csvText: string, datasetName: string = 'Dataset.csv'): Promise<{ data_summary: any; artifact?: CodePulseArtifact }> {
   const res = await fetch(`${API_BASE}/data/profile`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

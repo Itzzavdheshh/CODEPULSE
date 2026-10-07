@@ -29,13 +29,22 @@ class DataService:
         self.visualizer = VisualizationRecommendationEngine()
 
     def process_dataset(self, content: str, file_type: str = "csv", dataset_name: str = "Dataset") -> Dict[str, Any]:
-        df, summary = self.ingestion.ingest(content, file_type, dataset_name)
+        df, ingestion_summary = self.ingestion.ingest(content, file_type, dataset_name)
 
         # 1. Profile
         profile = self.profiler.profile_dataframe(df, dataset_name)
 
-        # 2. Quality Audit
-        quality_issues = self.quality.audit_quality(df)
+        # 2. Quality Audit — normalise to {issues_detected: [...]}
+        raw_issues = self.quality.audit_quality(df)
+        # Rename 'issue' -> 'issue_type' for frontend consistency
+        normalised_issues = [{
+            "issue_type": i.get("issue", i.get("issue_type", "Unknown")),
+            "severity": i["severity"],
+            "column": i["column"],
+            "count": i["count"],
+            "recommendation": i["recommendation"]
+        } for i in raw_issues]
+        quality = {"issues_detected": normalised_issues, "total_issues": len(normalised_issues)}
 
         # 3. Advanced Statistics & Relationships
         stats_results = self.statistics.compute_statistics(df)
@@ -48,19 +57,34 @@ class DataService:
 
         # Combine Human Insights
         insights = list(stats_results.get("insights", []))
-        if quality_issues:
-            insights.append(f"Audit detected {len(quality_issues)} quality issues (missing values, duplicates, or outliers).")
-        if ts_results.get("has_timeseries"):
-            insights.append(f"Time-series trend: {ts_results['trend']} ({ts_results['overall_growth_percentage']:+.1f}% growth over {ts_results['total_days']} days).")
+        if normalised_issues:
+            insights.append(f"Audit detected {len(normalised_issues)} quality issues (missing values, duplicates, or outliers).")
+        if ts_results and ts_results.get("has_timeseries"):
+            growth = ts_results.get('overall_growth_percentage') or ts_results.get('trend_metrics', {}).get('growth_percentage', 0)
+            days = ts_results.get('total_days') or ts_results.get('date_range', {}).get('duration_days', 0)
+            insights.append(f"Time-series detected over {days} days with {growth:+.1f}% overall growth trend.")
+
+        # Normalised summary for frontend DataStudio header cards
+        dup_count = int(df.duplicated().sum())
+        total_missing = int(df.isnull().sum().sum())
+        summary = {
+            "rows": int(df.shape[0]),
+            "columns": int(df.shape[1]),
+            "completeness_percentage": profile["completeness_percentage"],
+            "numeric_columns": profile["numeric_columns_count"],
+            "categorical_columns": profile["categorical_columns_count"],
+            "duplicate_rows": dup_count,
+            "missing_cells": total_missing,
+        }
 
         return {
             "dataset_name": dataset_name,
             "summary": summary,
             "profile": profile,
-            "quality_issues": quality_issues,
+            "quality": quality,
             "statistics": stats_results,
-            "timeseries": ts_results,
-            "recommendations": visual_recs,
+            "time_series": ts_results,
+            "visualizations": visual_recs,
             "insights": insights,
             "preview": df.head(100).replace({np.nan: None}).to_dict(orient="records"),
             "raw_csv": df.to_csv(index=False)
@@ -74,17 +98,29 @@ class DataService:
         normalize: bool = False
     ) -> Dict[str, Any]:
         df = pd.read_csv(io.StringIO(csv_text))
+        original_rows = len(df)
+
+        # Deduplicate first so the count is accurate
+        duplicates_removed = int(df.duplicated().sum())
+        df_deduped = df.drop_duplicates()
+
         cleaned_df, cleaning_summary = self.cleaner.clean_dataframe(
-            df, impute_strategy=impute_strategy, handle_outliers=handle_outliers, normalize=normalize
+            df_deduped, impute_strategy=impute_strategy, handle_outliers=handle_outliers, normalize=normalize
         )
         cleaned_profile = self.profiler.profile_dataframe(cleaned_df, "Cleaned Dataset")
         quality_issues = self.quality.audit_quality(cleaned_df)
 
         return {
+            # Frontend-friendly flat fields
+            "original_rows": original_rows,
+            "final_rows": len(cleaned_df),
+            "removed_duplicates": duplicates_removed,
+            "transformations_log": cleaning_summary.get("actions", []),
+            "cleaned_csv": cleaned_df.to_csv(index=False),
+            # Richer nested summary for downstream consumers
             "summary": cleaning_summary,
             "cleaned_profile": cleaned_profile,
             "remaining_quality_issues": quality_issues,
-            "csv_export": cleaned_df.to_csv(index=False),
             "preview": cleaned_df.head(50).replace({np.nan: None}).to_dict(orient="records")
         }
 

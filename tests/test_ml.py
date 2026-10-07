@@ -1,3 +1,4 @@
+"""Legacy ML test — updated to match current MLService API."""
 import pytest
 from app.ml.service import MLService
 
@@ -18,11 +19,11 @@ ML_DATASET_CSV = """loc,cyclomatic,diagnostics,risk_level
 
 def test_ml_service_classification():
     service = MLService()
-    res = service.train_and_evaluate(
+    res = service.train_and_compare(
         csv_text=ML_DATASET_CSV,
         target_column="risk_level",
-        model_name="random_forest",
-        task_type="classification"
+        task_type="classification",
+        primary_model_name="random_forest"
     )
 
     assert "evaluation" in res
@@ -31,11 +32,11 @@ def test_ml_service_classification():
 
 def test_ml_service_clustering():
     service = MLService()
-    res = service.train_and_evaluate(
+    res = service.train_and_compare(
         csv_text=ML_DATASET_CSV,
-        target_column="risk_level",
-        model_name="kmeans",
-        task_type="clustering"
+        target_column=None,
+        task_type="clustering",
+        primary_model_name="kmeans"
     )
 
     assert res["task_type"] == "clustering"

@@ -10,6 +10,15 @@ import { AcademicStudio } from './components/AcademicStudio';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('compiler');
+  // Cross-engine bridge: DataStudio → MLStudio
+  const [mlPrefillCsv, setMlPrefillCsv] = useState<string | undefined>(undefined);
+  const [mlPrefillName, setMlPrefillName] = useState<string | undefined>(undefined);
+
+  const handleSendToML = (csvText: string, datasetName: string) => {
+    setMlPrefillCsv(csvText);
+    setMlPrefillName(datasetName);
+    setActiveTab('ml');
+  };
 
   return (
     <div className="app-container">
@@ -17,8 +26,12 @@ export const App: React.FC = () => {
 
       <main className="main-content">
         {activeTab === 'compiler' && <CompilerStudio />}
-        {activeTab === 'data' && <DataStudio />}
-        {activeTab === 'ml' && <MLStudio />}
+        {activeTab === 'data' && (
+          <DataStudio onSendToML={handleSendToML} />
+        )}
+        {activeTab === 'ml' && (
+          <MLStudio prefillCsv={mlPrefillCsv} prefillName={mlPrefillName} />
+        )}
         {activeTab === 'visualizations' && <VisualizationsStudio />}
         {activeTab === 'artifacts' && <ArtifactsStudio />}
         {activeTab === 'reports' && <ReportsStudio />}
@@ -34,7 +47,7 @@ export const App: React.FC = () => {
         background: '#070A11',
         marginTop: '40px'
       }}>
-        CodePulse — Intelligent Software Analysis & Engineering Intelligence Platform &copy; 2026. Built with React, TypeScript & FastAPI.
+        CodePulse — Intelligent Software Analysis &amp; Engineering Intelligence Platform &copy; 2026. Built with React, TypeScript &amp; FastAPI.
       </footer>
     </div>
   );

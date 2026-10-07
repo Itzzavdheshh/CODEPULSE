@@ -151,17 +151,25 @@ export interface MLResult {
   target_column?: string;
   target_classes?: string[];
   features: string[];
+  imbalance_warning?: string;
+  dataset_split?: { train_size: number; test_size: number };
+  selected_model_rationale?: string;
+  model_comparison?: { model_name: string; metrics: any }[];
   evaluation: {
     accuracy?: number;
     precision?: number;
     recall?: number;
     f1_score?: number;
     roc_auc?: number;
+    cv_mean_accuracy?: number;
+    cv_std?: number;
+    cv_mean_r2?: number;
     confusion_matrix?: {
       labels: string[];
       matrix: number[][];
     };
     roc_curve?: { fpr: number; tpr: number }[];
+    mae?: number;
     mse?: number;
     rmse?: number;
     r2_score?: number;
@@ -171,6 +179,7 @@ export interface MLResult {
   };
   feature_importances: { feature_name: string; importance: number }[];
 }
+
 
 export interface CodePulseArtifact {
   artifact_id: string;

@@ -37,14 +37,19 @@ class ProjectAnalysisRequest(BaseModel):
 
 class MLTrainRequest(BaseModel):
     csv_text: str
-    target_column: str
+    target_column: Optional[str] = "risk_level"
     model_name: str = "random_forest"
     task_type: str = "classification"
     test_size: float = 0.2
     save_artifact: bool = True
 
+class MLPredictRequest(BaseModel):
+    ml_artifact_id: str
+    instance_data: Dict[str, Any]
+
 class DataProfileRequest(BaseModel):
     csv_text: str
+    file_type: str = "csv"
     dataset_name: str = "Uploaded Dataset"
     save_artifact: bool = True
 
@@ -127,19 +132,20 @@ def export_compiler_artifact(artifact_id: str, export_format: str):
 # --- Data Endpoints ---
 @router.post("/data/profile")
 def profile_dataset(req: DataProfileRequest):
-    res = data_service.process_csv_content(req.csv_text, req.dataset_name)
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
+    try:
+        res = data_service.process_dataset(req.csv_text, req.file_type, req.dataset_name)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     artifact = None
     if req.save_artifact:
         artifact = artifact_store.create_artifact(
             artifact_type="data_profile",
-            payload=res["profile"],
+            payload=res,
             title=f"Data Profile of {req.dataset_name}",
             engine="data",
             source_name=req.dataset_name,
-            summary=f"Profiled {res['profile']['shape']['rows']} rows, {res['profile']['shape']['columns']} cols. Completeness: {res['profile']['completeness_percentage']}%"
+            summary=f"Profiled {res['summary']['rows']} rows, {res['summary']['columns']} cols. Completeness: {res['summary']['completeness_percentage']}%"
         )
 
     return {
@@ -157,18 +163,28 @@ def clean_dataset(req: DataCleanRequest):
     )
     return res
 
+@router.get("/data/export/{artifact_id}")
+def export_data_artifact(artifact_id: str):
+    art = artifact_store.get_artifact(artifact_id)
+    if not art or art["artifact_type"] != "data_profile":
+        raise HTTPException(status_code=404, detail="Data profile artifact not found.")
+
+    res = data_service.export_data_bundle(art["payload"])
+    return Response(content=res["bytes"], media_type=res["content_type"], headers={"Content-Disposition": f"attachment; filename={res['filename']}"})
+
 # --- ML Endpoints ---
 @router.post("/ml/train")
 def train_ml_model(req: MLTrainRequest):
-    res = ml_service.train_and_evaluate(
-        csv_text=req.csv_text,
-        target_column=req.target_column,
-        model_name=req.model_name,
-        task_type=req.task_type,
-        test_size=req.test_size
-    )
-    if "error" in res:
-        raise HTTPException(status_code=400, detail=res["error"])
+    try:
+        res = ml_service.train_and_compare(
+            csv_text=req.csv_text,
+            target_column=req.target_column,
+            primary_model_name=req.model_name,
+            task_type=req.task_type,
+            test_size=req.test_size
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     artifact = None
     if req.save_artifact:
@@ -186,6 +202,27 @@ def train_ml_model(req: MLTrainRequest):
         "ml_result": res,
         "artifact": artifact
     }
+
+@router.post("/ml/predict")
+def predict_instance(req: MLPredictRequest):
+    art = artifact_store.get_artifact(req.ml_artifact_id)
+    if not art or art["artifact_type"] != "ml_model_result":
+        raise HTTPException(status_code=404, detail="ML model result artifact not found.")
+
+    res = ml_service.predict_instance(art["payload"], req.instance_data)
+    if not res.get("prediction_available"):
+        raise HTTPException(status_code=400, detail=res.get("error"))
+
+    return res
+
+@router.get("/ml/export/{artifact_id}")
+def export_ml_artifact(artifact_id: str):
+    art = artifact_store.get_artifact(artifact_id)
+    if not art or art["artifact_type"] != "ml_model_result":
+        raise HTTPException(status_code=404, detail="ML model result artifact not found.")
+
+    res = ml_service.export_ml_bundle(art["payload"])
+    return Response(content=res["bytes"], media_type=res["content_type"], headers={"Content-Disposition": f"attachment; filename={res['filename']}"})
 
 # --- Artifact Endpoints ---
 @router.get("/artifacts")
@@ -257,18 +294,38 @@ def get_academic_mappings():
             },
             {
                 "domain": "Data Handling & Visualization",
-                "laboratory_concepts": ["CSV Data Ingestion", "Statistical Profiling", "Data Cleaning & Imputation", "Correlation Matrix", "Outlier Truncation"],
-                "codepulse_features": ["Data Hub file uploader", "Descriptive moments summary", "Missing value auto-imputer", "Pearson heatmap visualizer", "IQR outlier filter"]
+                "laboratory_concepts": [
+                    "Multi-format Dataset Ingestion (CSV/JSON/Excel)", "Statistical Profiling & Moments",
+                    "Automated Quality Audit (Duplicates/Outliers/Nulls)", "Data Cleaning & Imputation",
+                    "Pearson & Spearman Rank Correlation", "Time-Series Aggregation & Trend Analysis",
+                    "Calendar Heatmap Activity Grid", "Automatic Visualization Recommendation Engine"
+                ],
+                "codepulse_features": [
+                    "Multi-format file loader", "Descriptive moments summary (Mean/Std/IQR/Skewness)",
+                    "Audit issue table with severity & recommendations", "Missing value auto-imputer & scaler",
+                    "Correlation heatmap & covariance matrix", "Daily/weekly resampling & SMA moving averages",
+                    "Date intensity activity heatmap", "Deterministic chart rule recommender"
+                ]
             },
             {
                 "domain": "Machine Learning",
-                "laboratory_concepts": ["Supervised Classification & Regression", "Unsupervised Clustering", "Model Evaluation Metrics", "Prediction Explainability"],
-                "codepulse_features": ["Random Forest / Decision Tree / Logistic Regression / K-Means studio", "Accuracy, F1, ROC-AUC & Confusion Matrix heatmap", "Feature importance & sample contribution breakdown"]
+                "laboratory_concepts": [
+                    "Data Leakage Prevention Pipeline", "Supervised Classification & Regression",
+                    "Unsupervised K-Means & Mean-Shift Clustering", "Model Comparison Matrix",
+                    "K-Fold Cross Validation", "Class Imbalance Warning Guard",
+                    "Feature Importance & Prediction Explainability", "Feature Compatibility Schema Guard"
+                ],
+                "codepulse_features": [
+                    "Training-set fitted Scalers & Encoders", "Random Forest / Decision Tree / Logistic Regression / SVM / K-Means studio",
+                    "Multi-model performance comparison table", "K-Fold mean & std score evaluator",
+                    "Majority class >80% warning banner", "Feature contribution breakdown",
+                    "Mandatory feature schema compatibility checker before prediction"
+                ]
             },
             {
                 "domain": "JavaScript & Web Engineering",
                 "laboratory_concepts": ["Modern Reactive Architecture", "Dynamic Canvas/SVG Graphics", "Asynchronous API Integration", "Schema-Driven Artifact Exchange"],
-                "codepulse_features": ["React 18 + TypeScript Developer Workspace", "Interactive CFG/Heatmap SVG renderers", "FastAPI REST client", "Cross-engine artifact pipelines"]
+                "codepulse_features": ["React 18 + TypeScript Developer Workspace", "Interactive CFG/Heatmap SVG renderers", "FastAPI REST client", "Cross-Engine Interoperability Pipelines"]
             }
         ]
     }

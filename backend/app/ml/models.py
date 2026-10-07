@@ -24,8 +24,10 @@ class ModelFactory:
             elif "svm" in model_name_lower or "svc" in model_name_lower:
                 from sklearn.svm import SVC
                 return SVC(probability=True, random_state=42)
-            else: # Fallback to Logistic Regression
+            elif "logistic" in model_name_lower or "logistic_regression" == model_name_lower:
                 return LogisticRegression(max_iter=1000, random_state=42)
+            else:
+                raise ValueError(f"Unknown classification model: '{model_name}'. Supported: random_forest, decision_tree, naive_bayes, svm, logistic_regression.")
 
         elif task_type == "regression":
             if "random_forest" in model_name_lower or "rf" == model_name_lower:
@@ -35,11 +37,13 @@ class ModelFactory:
             elif "svm" in model_name_lower or "svr" in model_name_lower:
                 from sklearn.svm import SVR
                 return SVR()
-            else: # Fallback to Linear Regression
+            elif "logistic" in model_name_lower or "linear" in model_name_lower:
                 return LinearRegression()
+            else:
+                raise ValueError(f"Unknown regression model: '{model_name}'. Supported: random_forest, decision_tree, svm, logistic_regression.")
 
         elif task_type == "clustering":
             n_clusters = params.get("n_clusters", 3)
             return KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
 
-        raise ValueError(f"Unsupported model or task: {model_name} ({task_type})")
+        raise ValueError(f"Unsupported task type: '{task_type}'. Use classification, regression, or clustering.")
