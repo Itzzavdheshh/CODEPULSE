@@ -21,6 +21,9 @@ class ModelFactory:
                 return DecisionTreeClassifier(max_depth=params.get("max_depth", None), random_state=42)
             elif "naive_bayes" in model_name_lower or "nb" == model_name_lower:
                 return GaussianNB()
+            elif "svm" in model_name_lower or "svc" in model_name_lower:
+                from sklearn.svm import SVC
+                return SVC(probability=True, random_state=42)
             else: # Fallback to Logistic Regression
                 return LogisticRegression(max_iter=1000, random_state=42)
 
@@ -29,6 +32,9 @@ class ModelFactory:
                 return RandomForestRegressor(n_estimators=params.get("n_estimators", 100), max_depth=params.get("max_depth", None), random_state=42)
             elif "decision_tree" in model_name_lower or "dt" == model_name_lower:
                 return DecisionTreeRegressor(max_depth=params.get("max_depth", None), random_state=42)
+            elif "svm" in model_name_lower or "svr" in model_name_lower:
+                from sklearn.svm import SVR
+                return SVR()
             else: # Fallback to Linear Regression
                 return LinearRegression()
 
