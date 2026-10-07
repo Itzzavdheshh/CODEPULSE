@@ -17,7 +17,7 @@ class TimeSeriesEngine:
             for col in df.columns:
                 if not pd.api.types.is_numeric_dtype(df[col]):
                     try:
-                        pd.to_datetime(df[col], errors='raise')
+                        pd.to_datetime(df[col], errors='raise', format='mixed')
                         target_date_col = col
                         break
                     except Exception:
@@ -31,7 +31,7 @@ class TimeSeriesEngine:
 
         # Parse datetime
         ts_df = df.copy()
-        ts_df["parsed_date"] = pd.to_datetime(ts_df[target_date_col], errors='coerce')
+        ts_df["parsed_date"] = pd.to_datetime(ts_df[target_date_col], errors='coerce', format='mixed')
         ts_df = ts_df.dropna(subset=["parsed_date"]).sort_values("parsed_date")
 
         if len(ts_df) < 3:

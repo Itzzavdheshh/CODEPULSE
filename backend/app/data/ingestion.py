@@ -55,7 +55,7 @@ class DataIngestionEngine:
         for col in df.columns:
             if not pd.api.types.is_numeric_dtype(df[col]):
                 try:
-                    pd.to_datetime(df[col], errors='raise')
+                    pd.to_datetime(df[col], errors='raise', format='mixed')
                     num_datetime += 1
                 except Exception:
                     pass
