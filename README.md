@@ -2,6 +2,8 @@
 
 > **Independent by Default. Integrated by Choice.**
 
+[![Tests](https://img.shields.io/badge/tests-116%20passed-brightgreen)](#testing) [![Frontend Build](https://img.shields.io/badge/frontend%20build-clean-brightgreen)](#frontend-setup) [![Python](https://img.shields.io/badge/python-3.12-blue)](#backend-setup) [![React](https://img.shields.io/badge/react-18-blue)](#frontend-setup)
+
 CodePulse is a unified, modular developer platform and software engineering intelligence suite. It integrates four core computer science disciplines into an extensible, schema-driven environment:
 
 1. **Compiler Intelligence Engine**: Lexical scanning, LALR/recursive-descent parsing, AST generation, symbol table scoping, type/semantic analysis, Three-Address Code (TAC) generation, constant folding optimization, Control-Flow Graph (CFG) basic block analysis, and code complexity metrics.
