@@ -63,17 +63,36 @@ class Parser:
     def parse(self) -> Tuple[ProgramNode, List[dict]]:
         self.diagnostics = []
         classes = []
-        
+
         while self.current_token().type != TokenType.EOF:
-            if self.current_token().value in ("public", "class"):
+            tok = self.current_token()
+
+            if tok.value in ("public", "class"):
                 cl_node = self.parse_class()
                 if cl_node:
                     classes.append(cl_node)
+
+            elif (
+                # Top-level function: type name '(' — e.g. int main()
+                (tok.value in self.TYPES or tok.type == TokenType.IDENTIFIER)
+                and self.peek_token().type == TokenType.IDENTIFIER
+                and self.peek_token(2).value == "("
+            ):
+                # Treat as top-level function wrapped in a synthetic class
+                member = self.parse_class_member()
+                if isinstance(member, MethodNode):
+                    cls = ClassNode(member.name.capitalize() + "Class", [member], [])
+                    classes.append(cls)
+                elif member:
+                    main_method = MethodNode("void", "main", [], BlockNode([member]), is_static=True)
+                    classes.append(ClassNode("Main", [main_method], []))
+                else:
+                    self.advance()
+
             else:
-                # Top-level statements / script style mode wrapper
+                # Top-level statements / script style
                 top_stmt = self.parse_statement()
                 if top_stmt:
-                    # Wrap top level statement into Main class/method for unified execution
                     main_method = MethodNode("void", "main", [], BlockNode([top_stmt]), is_static=True)
                     classes.append(ClassNode("Main", [main_method], []))
                 else:
@@ -286,22 +305,50 @@ class Parser:
     def parse_for_loop(self) -> ForNode:
         line = self.current_token().line
         col = self.current_token().column
-        self.advance() # for
+        self.advance()  # consume 'for'
         self.expect(TokenType.DELIMITER, "(")
-        
-        init = self.parse_statement() if self.current_token().value != ";" else None
-        if not init and self.current_token().value == ";":
-            self.advance()
-            
-        cond = self.parse_expression() if self.current_token().value != ";" else None
+
+        # --- Init clause: either a var decl ("int i = 0;") or an expression + ";" or empty
+        init = None
+        if self.current_token().value != ";":
+            if self.current_token().value in self.TYPES:
+                init = self.parse_var_decl()      # consumes trailing ";"
+            else:
+                init = self.parse_expression()
+                if self.current_token().value == ";":
+                    self.advance()
+        else:
+            self.advance()  # skip empty ";"
+
+        # --- Condition clause
+        cond = None
+        if self.current_token().value != ";":
+            cond = self.parse_expression()
         if self.current_token().value == ";":
             self.advance()
-            
-        update = self.parse_expression() if self.current_token().value != ")" else None
+
+        # --- Update clause: `i = i + 1`  OR  `i++`  — NO trailing semicolon
+        update = None
+        if self.current_token().value != ")":
+            update = self._parse_for_update()
+
         self.expect(TokenType.DELIMITER, ")")
-        
         body = self.parse_statement() or BlockNode([])
         return ForNode(init, cond, update, body, line, col)
+
+    def _parse_for_update(self) -> "ASTNode":
+        """
+        Parse the update clause of a for-loop without requiring a trailing semicolon.
+        Supports: identifier = expression  OR  expression (e.g. i++).
+        """
+        tok = self.current_token()
+        if tok.type == TokenType.IDENTIFIER and self.peek_token().value == "=":
+            line, col = tok.line, tok.column
+            name = self.advance().value  # consume identifier
+            self.advance()              # consume "="
+            val = self.parse_expression()
+            return AssignNode(name, val, line, col)
+        return self.parse_expression()
 
     def parse_return_statement(self) -> ReturnNode:
         line = self.current_token().line
