@@ -20,7 +20,10 @@ class Preprocessor:
             "cleaned_source": cleaned_source,
             "macros": macros,
             "macro_expansions": macro_expansions,
-            "comment_stats": comment_stats
+            "comment_stats": comment_stats,
+            # Convenience summary fields for frontend + tests
+            "comments_removed": comment_stats["single_line_comments_count"] + comment_stats["block_comments_count"],
+            "macros_defined": len(macros),
         }
 
     def expand_macros(self, code: str) -> Tuple[str, List[Dict[str, str]], List[str]]:
