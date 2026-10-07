@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 from app.compiler.service import CompilerService
+from app.compiler.grammar import GrammarAnalyzer
+from app.compiler.project import MultiFileProjectAnalyzer
 from app.data.service import DataService
 from app.ml.service import MLService
 from app.artifacts.store import ArtifactStore
@@ -11,6 +13,8 @@ from app.reports.generator import IntegratedReportGenerator
 router = APIRouter(prefix="/api/v1")
 
 compiler_service = CompilerService()
+grammar_analyzer = GrammarAnalyzer()
+project_analyzer = MultiFileProjectAnalyzer()
 data_service = DataService()
 ml_service = MLService()
 artifact_store = ArtifactStore()
@@ -22,6 +26,14 @@ class CompilerAnalysisRequest(BaseModel):
     source_code: str
     file_name: str = "Source.java"
     save_artifact: bool = True
+
+class GrammarAnalysisRequest(BaseModel):
+    productions: Optional[Dict[str, List[str]]] = None
+    recursive_descent_input: str = "c a b d"
+    shift_reduce_input: str = "i + i * i"
+
+class ProjectAnalysisRequest(BaseModel):
+    files: List[Dict[str, str]]
 
 class MLTrainRequest(BaseModel):
     csv_text: str
@@ -54,7 +66,7 @@ def healthcheck():
     return {
         "status": "healthy",
         "platform": "CodePulse — Intelligent Software Analysis & Engineering Intelligence Platform",
-        "engines": ["compiler", "data", "ml", "artifacts", "reports"]
+        "engines": ["compiler", "grammar", "data", "ml", "artifacts", "reports"]
     }
 
 # --- Compiler Endpoints ---
@@ -62,9 +74,9 @@ def healthcheck():
 def analyze_compiler_code(req: CompilerAnalysisRequest):
     if not req.source_code.strip():
         raise HTTPException(status_code=400, detail="Source code cannot be empty.")
-    
+
     analysis = compiler_service.analyze_source(req.source_code, req.file_name)
-    
+
     artifact = None
     if req.save_artifact:
         artifact = artifact_store.create_artifact(
@@ -80,6 +92,37 @@ def analyze_compiler_code(req: CompilerAnalysisRequest):
         "analysis": analysis,
         "artifact": artifact
     }
+
+@router.post("/compiler/grammar/analyze")
+def analyze_grammar(req: GrammarAnalysisRequest):
+    grammar_res = grammar_analyzer.analyze_grammar(req.productions)
+    rd_res = grammar_analyzer.simulate_recursive_descent(req.recursive_descent_input)
+    sr_res = grammar_analyzer.simulate_shift_reduce(req.shift_reduce_input)
+
+    return {
+        "grammar_analysis": grammar_res,
+        "recursive_descent_trace": rd_res,
+        "shift_reduce_trace": sr_res
+    }
+
+@router.post("/compiler/project/analyze")
+def analyze_project(req: ProjectAnalysisRequest):
+    if not req.files:
+        raise HTTPException(status_code=400, detail="Project file list cannot be empty.")
+    res = project_analyzer.analyze_project(req.files)
+    return res
+
+@router.get("/compiler/export/{artifact_id}/{export_format}")
+def export_compiler_artifact(artifact_id: str, export_format: str):
+    art = artifact_store.get_artifact(artifact_id)
+    if not art or art["artifact_type"] != "compiler_analysis":
+        raise HTTPException(status_code=404, detail="Compiler analysis artifact not found.")
+
+    res = artifact_store.export_compiler_dataset(art, export_format)
+
+    if "bytes" in res:
+        return Response(content=res["bytes"], media_type=res["content_type"], headers={"Content-Disposition": f"attachment; filename={res['filename']}"})
+    return Response(content=res["data"], media_type=res["content_type"], headers={"Content-Disposition": f"attachment; filename={res['filename']}"})
 
 # --- Data Endpoints ---
 @router.post("/data/profile")
@@ -195,8 +238,22 @@ def get_academic_mappings():
         "academic_laboratories": [
             {
                 "domain": "Compiler Design",
-                "laboratory_concepts": ["Lexical Analysis", "Syntax Analysis & AST", "Semantic Analysis & Symbol Table", "Intermediate Representation (TAC)", "Code Optimization", "Control-Flow Graph (CFG)", "Cyclomatic Complexity"],
-                "codepulse_features": ["Tokens inspector with line/col tracking", "AST Tree Visualizer", "Hierarchical Scope Table", "Quadruples TAC generator", "Constant Folding Optimizer", "SVG Basic Blocks graph", "Software metrics dashboard"]
+                "laboratory_concepts": [
+                    "Comment Removal Analysis", "Keyword Frequency Analysis", "Macro Preprocessor (#define)",
+                    "Lexical Analysis & Tokenizer", "FIRST & FOLLOW Sets", "Left Recursion Elimination",
+                    "Recursive Descent Trace Parser", "Shift-Reduce Parsing", "Syntax Analysis & AST",
+                    "Hierarchical Symbol Table", "Semantic Analysis & Diagnostics", "Three-Address Code (TAC)",
+                    "Constant Folding & Propagation", "Control-Flow Graph (CFG)", "Cyclomatic Complexity V(G)",
+                    "Target Code Generation (JVM Assembly)"
+                ],
+                "codepulse_features": [
+                    "String-aware comment stripper", "Keyword frequency statistics", "Macro expansion engine",
+                    "Token stream inspector", "FIRST/FOLLOW calculator", "Direct left recursion converter",
+                    "Interactive RD parse step logger", "Stack-based Shift-Reduce trace viewer", "AST Explorer",
+                    "Scoped symbol table exporter", "Type & scope error diagnostics", "TAC Quadruples generator",
+                    "Constant Folding optimizer", "Interactive SVG CFG visualizer", "Software metrics dashboard",
+                    "JVM-like educational bytecode target emitter"
+                ]
             },
             {
                 "domain": "Data Handling & Visualization",

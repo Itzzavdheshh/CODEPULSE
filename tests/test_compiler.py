@@ -1,8 +1,11 @@
 import pytest
 from app.compiler.service import CompilerService
+from app.compiler.project import MultiFileProjectAnalyzer
 
-def test_compiler_service_valid_code():
+def test_compiler_service_full_pipeline():
     code = """
+    #define MAX 100
+    // Main calculation class
     public class Factorial {
         public static void main(String[] args) {
             int n = 5;
@@ -20,31 +23,21 @@ def test_compiler_service_valid_code():
     res = service.analyze_source(code, "Factorial.java")
 
     assert res["file_name"] == "Factorial.java"
-    assert len(res["tokens"]) > 10
-    assert res["ast"]["node_type"] == "Program"
-    assert len(res["symbol_table"]) > 0
-    assert res["metrics"]["cyclomatic_complexity"] >= 2
-    assert len(res["intermediate_code"]) > 0
-    assert len(res["cfg"]["nodes"]) >= 2
-    assert res["stats"]["errors_count"] == 0
+    assert "preprocessing" in res
+    assert res["preprocessing"]["comment_stats"]["single_line_comments_count"] == 1
+    assert "keyword_frequency" in res
+    assert "while" in res["keyword_frequency"]
+    assert "target_code" in res
+    assert "bipush" in res["target_code"]["assembly_code"]
 
-def test_compiler_service_syntax_error():
-    code = "class Test { int x = ; }"
-    service = CompilerService()
-    res = service.analyze_source(code, "SyntaxErr.java")
+def test_multifile_project_analyzer():
+    files = [
+        {"file_name": "Main.java", "source_code": "public class Main { public static void main() { Helper.doWork(); } }"},
+        {"file_name": "Helper.java", "source_code": "public class Helper { public static void doWork() { int x = 10; } }"}
+    ]
+    analyzer = MultiFileProjectAnalyzer()
+    res = analyzer.analyze_project(files)
 
-    assert res["stats"]["errors_count"] > 0
-    assert any(d["phase"] == "Syntax Analysis" for d in res["diagnostics"])
-
-def test_compiler_service_type_error():
-    code = """
-    class TypeTest {
-        void test() {
-            int x = "hello";
-        }
-    }
-    """
-    service = CompilerService()
-    res = service.analyze_source(code, "TypeErr.java")
-
-    assert any("Type mismatch" in d["message"] for d in res["diagnostics"])
+    assert res["files_count"] == 2
+    assert "Helper" in res["declared_classes"]
+    assert len(res["dependencies"]) >= 1

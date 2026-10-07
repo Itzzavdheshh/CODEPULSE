@@ -1,11 +1,15 @@
 import uuid
 import datetime
 import json
+import io
+import zipfile
+import pandas as pd
 from typing import Dict, Any, List, Optional
 
 class ArtifactStore:
     """
-    Schema-driven Artifact Repository for cross-engine artifact exchange.
+    Schema-driven Artifact Repository for cross-engine artifact exchange
+    and downloadable dataset exports (JSON, CSV, ZIP).
     """
     def __init__(self):
         self._artifacts: Dict[str, Dict[str, Any]] = {}
@@ -20,7 +24,7 @@ class ArtifactStore:
         summary: str = ""
     ) -> Dict[str, Any]:
         art_id = str(uuid.uuid4())
-        created_at = datetime.datetime.utcnow().isoformat() + "Z"
+        created_at = datetime.datetime.now(datetime.UTC).isoformat().replace("+00:00", "Z")
 
         artifact = {
             "artifact_id": art_id,
@@ -49,16 +53,61 @@ class ArtifactStore:
             arts = [a for a in arts if a["artifact_type"] == artifact_type]
         return sorted(arts, key=lambda x: x["created_at"], reverse=True)
 
+    def export_compiler_dataset(self, compiler_artifact: Dict[str, Any], export_format: str) -> Dict[str, Any]:
+        """
+        Exports compiler analysis as CSV, JSON, or zipped bundle.
+        Formats supported: 'tokens_csv', 'symbol_table_csv', 'tac_csv', 'metrics_csv', 'ast_json', 'cfg_json', 'zip'
+        """
+        payload = compiler_artifact.get("payload", {})
+        
+        if export_format == "tokens_csv":
+            df = pd.DataFrame(payload.get("tokens", []))
+            return {"content_type": "text/csv", "filename": "tokens.csv", "data": df.to_csv(index=False)}
+
+        elif export_format == "symbol_table_csv":
+            df = pd.DataFrame(payload.get("symbol_table", []))
+            return {"content_type": "text/csv", "filename": "symbol_table.csv", "data": df.to_csv(index=False)}
+
+        elif export_format == "tac_csv":
+            df = pd.DataFrame(payload.get("intermediate_code", []))
+            return {"content_type": "text/csv", "filename": "tac.csv", "data": df.to_csv(index=False)}
+
+        elif export_format == "optimized_tac_csv":
+            df = pd.DataFrame(payload.get("optimized_code", []))
+            return {"content_type": "text/csv", "filename": "optimized_tac.csv", "data": df.to_csv(index=False)}
+
+        elif export_format == "metrics_csv":
+            df = pd.DataFrame([payload.get("metrics", {})])
+            return {"content_type": "text/csv", "filename": "metrics.csv", "data": df.to_csv(index=False)}
+
+        elif export_format == "ast_json":
+            return {"content_type": "application/json", "filename": "ast.json", "data": json.dumps(payload.get("ast", {}), indent=2)}
+
+        elif export_format == "cfg_json":
+            return {"content_type": "application/json", "filename": "cfg.json", "data": json.dumps(payload.get("cfg", {}), indent=2)}
+
+        elif export_format == "zip":
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("compiler_analysis.json", json.dumps(payload, indent=2))
+                zf.writestr("tokens.csv", pd.DataFrame(payload.get("tokens", [])).to_csv(index=False))
+                zf.writestr("symbol_table.csv", pd.DataFrame(payload.get("symbol_table", [])).to_csv(index=False))
+                zf.writestr("tac.csv", pd.DataFrame(payload.get("intermediate_code", [])).to_csv(index=False))
+                zf.writestr("optimized_tac.csv", pd.DataFrame(payload.get("optimized_code", [])).to_csv(index=False))
+                zf.writestr("metrics.csv", pd.DataFrame([payload.get("metrics", {})]).to_csv(index=False))
+                zf.writestr("ast.json", json.dumps(payload.get("ast", {}), indent=2))
+                zf.writestr("cfg.json", json.dumps(payload.get("cfg", {}), indent=2))
+
+            zip_buffer.seek(0)
+            return {"content_type": "application/zip", "filename": "compiler_artifacts.zip", "bytes": zip_buffer.getvalue()}
+
+        return {"content_type": "application/json", "filename": "compiler_analysis.json", "data": json.dumps(payload, indent=2)}
+
     def convert_compiler_to_ml_dataset(self, compiler_artifact: Dict[str, Any]) -> str:
-        """
-        Converts Compiler analysis artifact payload into a structured CSV for ML classification/regression!
-        Extracts metrics, token counts, decision structures into feature rows.
-        """
         payload = compiler_artifact.get("payload", {})
         metrics = payload.get("metrics", {})
         stats = payload.get("stats", {})
-        
-        # Build synthetic/extracted sample rows representing function/block complexity features
+
         rows = [
             {
                 "loc": metrics.get("total_loc", 10),
@@ -72,10 +121,9 @@ class ArtifactStore:
                 "risk_level": metrics.get("risk_level", "LOW")
             }
         ]
-        
-        # Add variation rows derived from Basic Blocks for realistic ML dataset generation
+
         blocks = payload.get("basic_blocks", [])
-        for idx, b in enumerate(blocks):
+        for b in blocks:
             inst_cnt = len(b.get("instructions", []))
             rows.append({
                 "loc": inst_cnt + 2,
@@ -89,6 +137,5 @@ class ArtifactStore:
                 "risk_level": "HIGH" if inst_cnt > 10 else ("MODERATE" if inst_cnt > 5 else "LOW")
             })
 
-        import pandas as pd
         df = pd.DataFrame(rows)
         return df.to_csv(index=False)

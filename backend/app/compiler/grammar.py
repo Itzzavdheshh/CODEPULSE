@@ -194,6 +194,7 @@ class GrammarAnalyzer:
             return False
 
         def parse_A() -> bool:
+            nonlocal pos
             trace.append({"step": len(trace) + 1, "action": "EXPAND A -> a b | a", "input_remaining": " ".join(tokens[pos:])})
             saved_pos = pos
             if match("a"):

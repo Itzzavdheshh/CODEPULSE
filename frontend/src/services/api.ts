@@ -15,6 +15,38 @@ export async function analyzeCompilerSource(sourceCode: string, fileName: string
   return res.json();
 }
 
+export async function analyzeGrammar(productions?: Record<string, string[]>, rdInput?: string, srInput?: string): Promise<any> {
+  const res = await fetch(`${API_BASE}/compiler/grammar/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      productions: productions || null,
+      recursive_descent_input: rdInput || 'c a b d',
+      shift_reduce_input: srInput || 'i + i * i'
+    })
+  });
+  if (!res.ok) {
+    throw new Error('Grammar analysis request failed');
+  }
+  return res.json();
+}
+
+export async function analyzeProject(files: { file_name: string; source_code: string }[]): Promise<any> {
+  const res = await fetch(`${API_BASE}/compiler/project/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ files })
+  });
+  if (!res.ok) {
+    throw new Error('Multi-file project analysis failed');
+  }
+  return res.json();
+}
+
+export function getExportUrl(artifactId: string, format: string): string {
+  return `${API_BASE}/compiler/export/${artifactId}/${format}`;
+}
+
 export async function profileDataset(csvText: string, datasetName: string = 'Dataset.csv'): Promise<{ data_summary: { profile: DataProfile; preview: any[] }; artifact?: CodePulseArtifact }> {
   const res = await fetch(`${API_BASE}/data/profile`, {
     method: 'POST',

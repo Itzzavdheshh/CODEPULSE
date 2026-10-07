@@ -56,6 +56,30 @@ export interface CompilerMetrics {
   maintainability_index: string;
 }
 
+export interface PreprocessingData {
+  original_source: string;
+  macro_expanded_source: string;
+  cleaned_source: string;
+  macros: { name: string; value: string }[];
+  macro_expansions: string[];
+  comment_stats: {
+    single_line_comments_count: number;
+    block_comments_count: number;
+    total_comment_lines: number;
+    removed_characters: number;
+    comment_lines: number[];
+  };
+}
+
+export interface TargetCodeData {
+  target_architecture: string;
+  instructions_count: number;
+  max_stack_depth: number;
+  local_slots_count: number;
+  assembly_code: string;
+  instructions: { pc: number; mnemonic: string; description: string; stack_depth: number }[];
+}
+
 export interface CompilerAnalysis {
   source_code: string;
   file_name: string;
@@ -69,6 +93,8 @@ export interface CompilerAnalysis {
     errors_count: number;
     warnings_count: number;
   };
+  preprocessing?: PreprocessingData;
+  keyword_frequency?: Record<string, number>;
   tokens: Token[];
   ast: any;
   symbol_table: SymbolItem[];
@@ -81,6 +107,7 @@ export interface CompilerAnalysis {
     nodes: CFGNode[];
     edges: CFGEdge[];
   };
+  target_code?: TargetCodeData;
   metrics: CompilerMetrics;
 }
 
