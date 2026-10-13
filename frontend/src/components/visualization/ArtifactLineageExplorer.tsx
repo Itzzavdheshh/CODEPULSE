@@ -40,12 +40,15 @@ export const ArtifactLineageExplorer: React.FC = () => {
     switch (type) {
       case 'compiler':
       case 'compiler_analysis':
+      case 'tac_execution_trace':
         return <Cpu className="w-5 h-5 text-blue-400" />;
       case 'data':
       case 'dataset_profile':
+      case 'growth_analysis':
         return <Database className="w-5 h-5 text-cyan-400" />;
       case 'ml':
       case 'ml_model':
+      case 'model_xray':
         return <Brain className="w-5 h-5 text-purple-400" />;
       case 'report':
       case 'pdf_report':

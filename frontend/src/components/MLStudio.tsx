@@ -27,6 +27,7 @@ const REGRESSION_MODELS = [
 
 const CLUSTERING_MODELS = [
   { value: 'kmeans', label: 'K-Means Clustering' },
+  { value: 'mean_shift', label: 'Mean-Shift Clustering' },
 ];
 
 interface MLStudioProps {
@@ -235,27 +236,79 @@ export const MLStudio: React.FC<MLStudioProps> = ({ prefillCsv, prefillName }) =
             <div>
               {/* Summary KPIs */}
               <div className="grid-3" style={{ marginBottom: '16px' }}>
-                <MetricCard
-                  title="Model Accuracy"
-                  value={`${((result.evaluation?.accuracy || 0) * 100).toFixed(1)}%`}
-                  badgeText="BEST MODEL"
-                  badgeType="low"
-                  description={`Algorithm: ${result.model_name.toUpperCase()}`}
-                />
-                <MetricCard
-                  title="F1 Score"
-                  value={(result.evaluation?.f1_score || 0).toFixed(3)}
-                  badgeText="Balanced"
-                  badgeType="info"
-                  description="Harmonic mean of precision & recall"
-                />
-                <MetricCard
-                  title="CV Mean Score"
-                  value={(result.evaluation?.cv_mean_accuracy || 0).toFixed(3)}
-                  badgeText={`±${(result.evaluation?.cv_std || 0).toFixed(3)}`}
-                  badgeType="low"
-                  description="K-Fold Cross-Validation Accuracy"
-                />
+                {result.task_type === 'clustering' ? (
+                  <>
+                    <MetricCard
+                      title="Silhouette Score"
+                      value={result.evaluation?.silhouette_score !== undefined ? Number(result.evaluation.silhouette_score).toFixed(3) : 'N/A'}
+                      badgeText="SPATIAL"
+                      badgeType="low"
+                      description={`Algorithm: ${result.model_name.toUpperCase()}`}
+                    />
+                    <MetricCard
+                      title="Cluster Count"
+                      value={String(result.evaluation?.n_clusters ?? 'N/A')}
+                      badgeText="Partitions"
+                      badgeType="info"
+                      description="Estimated clusters / groupings"
+                    />
+                    <MetricCard
+                      title="Dataset Size"
+                      value={`${result.dataset_size ?? 0} Samples`}
+                      badgeText="Unsupervised"
+                      badgeType="low"
+                      description={`Features: ${result.features?.length || 0}`}
+                    />
+                  </>
+                ) : result.task_type === 'regression' ? (
+                  <>
+                    <MetricCard
+                      title="R² Score"
+                      value={result.evaluation?.r2_score !== undefined ? Number(result.evaluation.r2_score).toFixed(3) : 'N/A'}
+                      badgeText="BEST MODEL"
+                      badgeType="low"
+                      description={`Algorithm: ${result.model_name.toUpperCase()}`}
+                    />
+                    <MetricCard
+                      title="MAE"
+                      value={result.evaluation?.mae !== undefined ? Number(result.evaluation.mae).toFixed(3) : 'N/A'}
+                      badgeText="Error"
+                      badgeType="info"
+                      description="Mean Absolute Error"
+                    />
+                    <MetricCard
+                      title="RMSE"
+                      value={result.evaluation?.rmse !== undefined ? Number(result.evaluation.rmse).toFixed(3) : 'N/A'}
+                      badgeText="Root Error"
+                      badgeType="low"
+                      description="Root Mean Squared Error"
+                    />
+                  </>
+                ) : (
+                  <>
+                    <MetricCard
+                      title="Model Accuracy"
+                      value={result.evaluation?.accuracy !== undefined ? `${(Number(result.evaluation.accuracy) * 100).toFixed(1)}%` : 'N/A'}
+                      badgeText="BEST MODEL"
+                      badgeType="low"
+                      description={`Algorithm: ${result.model_name.toUpperCase()}`}
+                    />
+                    <MetricCard
+                      title="F1 Score"
+                      value={result.evaluation?.f1_score !== undefined ? Number(result.evaluation.f1_score).toFixed(3) : 'N/A'}
+                      badgeText="Balanced"
+                      badgeType="info"
+                      description="Harmonic mean of precision & recall"
+                    />
+                    <MetricCard
+                      title="CV Mean Score"
+                      value={result.evaluation?.cv_mean_accuracy !== undefined ? Number(result.evaluation.cv_mean_accuracy).toFixed(3) : 'N/A'}
+                      badgeText={`±${(result.evaluation?.cv_std || 0).toFixed(3)}`}
+                      badgeType="low"
+                      description="K-Fold Cross-Validation Accuracy"
+                    />
+                  </>
+                )}
               </div>
 
               {/* Subtabs */}
@@ -399,14 +452,16 @@ export const MLStudio: React.FC<MLStudioProps> = ({ prefillCsv, prefillName }) =
                   </div>
 
                   <button className="btn btn-primary" onClick={handlePredict} disabled={predictLoading} style={{ width: '100%' }}>
-                    <Play size={14} /> {predictLoading ? 'Predicting...' : 'Predict Software Defect Risk'}
+                    <Play size={14} /> {predictLoading ? 'Predicting...' : result?.task_type === 'regression' ? 'Predict Target Value' : result?.task_type === 'clustering' ? 'Assign Cluster' : 'Predict Software Defect Risk'}
                   </button>
 
                   {predictResult && (
                     <div style={{ marginTop: '16px', padding: '16px', borderRadius: 'var(--radius-md)', background: 'var(--brand-primary-light)', border: '1px solid var(--brand-primary)' }}>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Predicted Classification:</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {result?.task_type === 'regression' ? 'Predicted Value:' : result?.task_type === 'clustering' ? 'Assigned Cluster:' : 'Predicted Classification:'}
+                      </div>
                       <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--brand-primary)', marginTop: '2px' }}>
-                        {String(predictResult.prediction)}
+                        {String(predictResult.predicted_class ?? predictResult.prediction ?? predictResult.cluster_id ?? predictResult.value ?? 'N/A')}
                       </div>
                       {predictResult.probabilities && (
                         <div style={{ marginTop: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>

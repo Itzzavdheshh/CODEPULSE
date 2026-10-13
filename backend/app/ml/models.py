@@ -44,7 +44,15 @@ class ModelFactory:
                 raise ValueError(f"Unknown regression model: '{model_name}'. Supported: random_forest, decision_tree, svm, logistic_regression.")
 
         elif task_type == "clustering":
-            n_clusters = params.get("n_clusters", 3)
-            return KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+            if "mean_shift" in model_name_lower or "meanshift" in model_name_lower:
+                from sklearn.cluster import MeanShift
+                bandwidth = params.get("bandwidth", None)
+                return MeanShift(bandwidth=bandwidth)
+            elif "kmeans" in model_name_lower or "k_means" in model_name_lower:
+                n_clusters = params.get("n_clusters", 3)
+                return KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+            else:
+                n_clusters = params.get("n_clusters", 3)
+                return KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
 
         raise ValueError(f"Unsupported task type: '{task_type}'. Use classification, regression, or clustering.")

@@ -24,7 +24,10 @@
         "ml_model_result",
         "ml_evaluation",
         "ml_predictions",
-        "integrated_report"
+        "integrated_report",
+        "tac_execution_trace",
+        "growth_analysis",
+        "model_xray"
       ]
     },
     "schema": {

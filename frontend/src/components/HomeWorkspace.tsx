@@ -30,7 +30,11 @@ export const HomeWorkspace: React.FC<HomeWorkspaceProps> = ({
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
               <span className="badge badge-info">WORKSPACE: {selectedWorkspace}</span>
-              <span className="badge badge-high">RISK LEVEL: HIGH</span>
+              {compilerArtifacts.length > 0 && (
+                <span className={`badge ${compilerArtifacts[0].payload?.metrics?.risk_level === 'HIGH' ? 'badge-high' : compilerArtifacts[0].payload?.metrics?.risk_level === 'MODERATE' ? 'badge-moderate' : 'badge-low'}`}>
+                  RISK LEVEL: {compilerArtifacts[0].payload?.metrics?.risk_level || 'ANALYZED'}
+                </span>
+              )}
             </div>
             <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em', marginBottom: '4px' }}>
               Software Intelligence Workspace
@@ -86,15 +90,31 @@ export const HomeWorkspace: React.FC<HomeWorkspaceProps> = ({
           icon={Database}
           accentColor="var(--color-emerald)"
         />
-        <MetricCard
-          title="Defect Risk Level"
-          value="HIGH"
-          badgeText="79% Prob"
-          badgeType="high"
-          description="Predicted by Random Forest & Gradient Boosting"
-          icon={Brain}
-          accentColor="var(--color-rose)"
-        />
+        {mlArtifacts.length > 0 ? (
+          <MetricCard
+            title="Defect Risk Level"
+            value={
+              mlArtifacts[0].payload?.evaluation?.accuracy !== undefined
+                ? `${((mlArtifacts[0].payload?.evaluation?.accuracy || 0) * 100).toFixed(1)}% Acc`
+                : (mlArtifacts[0].payload?.model_name || "Trained").toUpperCase()
+            }
+            badgeText={mlArtifacts[0].payload?.model_name?.toUpperCase() || "MODEL"}
+            badgeType="high"
+            description={`Trained ${mlArtifacts[0].payload?.task_type || "ML"} model (${mlArtifacts[0].payload?.features?.length || 0} features)`}
+            icon={Brain}
+            accentColor="var(--color-rose)"
+          />
+        ) : (
+          <MetricCard
+            title="Defect Risk Level"
+            value="Not Executed"
+            badgeText="Pending"
+            badgeType="info"
+            description="No ML model trained yet. Run training in ML Studio."
+            icon={Brain}
+            accentColor="var(--color-rose)"
+          />
+        )}
       </div>
 
       {/* Main Overview Grid: Storyline Pipeline + Recent Analysis & Insights */}

@@ -1,13 +1,15 @@
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 import pandas as pd
 import zipfile
 import base64
 import io
+import math
 from app.compiler.service import CompilerService
 from app.compiler.grammar import GrammarAnalyzer
 from app.compiler.project import MultiFileProjectAnalyzer
+from app.compiler.interpreter import extract_param_map, TACInterpreter, run_both
 from app.data.service import DataService
 from app.ml.service import MLService
 from app.artifacts.store import ArtifactStore
@@ -32,6 +34,15 @@ class CompilerAnalysisRequest(BaseModel):
     source_code: str
     file_name: str = "SoftwareRiskAnalyzer.java"
     save_artifact: bool = True
+
+class CompilerInterpretRequest(BaseModel):
+    source_code: Optional[str] = None
+    compiler_artifact_id: Optional[str] = None
+    method: str
+    args: Union[List[Any], Dict[str, Any]]
+    variant: Optional[str] = "optimized"
+    include_trace: Optional[bool] = False
+    save_artifact: Optional[bool] = False
 
 class GrammarAnalysisRequest(BaseModel):
     productions: Optional[Dict[str, List[str]]] = None
@@ -199,6 +210,121 @@ def export_compiler_artifact(artifact_id: str, export_format: str):
         return Response(content=res["bytes"], media_type=res["content_type"], headers={"Content-Disposition": f"attachment; filename={res['filename']}"})
     return Response(content=res["data"], media_type=res["content_type"], headers={"Content-Disposition": f"attachment; filename={res['filename']}"})
 
+@router.post("/compiler/interpret", summary="Execute TAC quadruples with the TAC interpreter")
+def interpret_compiler_tac(req: CompilerInterpretRequest):
+    """
+    Executes raw, optimized, or both TAC variants with explicit call frame stack,
+    32-bit signed wrapping, CFG basic block tracking, and step/opcode counting.
+    """
+    # 1. Exactly one of source_code / compiler_artifact_id must be given
+    has_source = req.source_code is not None and req.source_code.strip() != ""
+    has_artifact = req.compiler_artifact_id is not None and req.compiler_artifact_id.strip() != ""
+    if (has_source and has_artifact) or (not has_source and not has_artifact):
+        raise HTTPException(
+            status_code=422,
+            detail="Exactly one of 'source_code' or 'compiler_artifact_id' must be provided."
+        )
+
+    # 2. Validate variant
+    variant = (req.variant or "optimized").lower()
+    if variant not in ("raw", "optimized", "both"):
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid variant: must be 'raw', 'optimized', or 'both'."
+        )
+
+    # 3. Validate numbers are finite
+    def validate_finite(v: Any):
+        if isinstance(v, (int, float)):
+            if math.isnan(v) or math.isinf(v):
+                raise HTTPException(status_code=422, detail="Arguments must contain only finite numbers.")
+        elif isinstance(v, list):
+            for item in v:
+                validate_finite(item)
+        elif isinstance(v, dict):
+            for val in v.values():
+                validate_finite(val)
+
+    validate_finite(req.args)
+
+    # 4. Obtain compiler analysis
+    if has_source:
+        analysis = compiler_service.analyze_source(req.source_code)
+        errors = [d for d in analysis.get("diagnostics", []) if d.get("severity") == "error"]
+        if errors:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Compiler diagnostics reported fatal errors: {errors[0].get('message')}"
+            )
+    else:
+        art = artifact_store.get_artifact(req.compiler_artifact_id)
+        if not art or art.get("artifact_type") != "compiler_analysis":
+            raise HTTPException(
+                status_code=422,
+                detail=f"Compiler analysis artifact '{req.compiler_artifact_id}' not found or invalid type."
+            )
+        analysis = art.get("payload", {})
+
+    # 5. Method existence and parameter validation
+    param_map = extract_param_map(analysis.get("ast", {}))
+    target_method = req.method
+    if target_method not in param_map:
+        matched = None
+        for m in param_map:
+            if m.lower() == target_method.lower():
+                matched = m
+                break
+        if not matched:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Method '{req.method}' not found in compiler analysis. Available methods: {list(param_map.keys())}"
+            )
+        target_method = matched
+
+    expected_params = param_map[target_method]
+    if isinstance(req.args, list):
+        if len(req.args) != len(expected_params):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Argument count mismatch for method '{target_method}': expected {len(expected_params)}, got {len(req.args)}."
+            )
+    elif isinstance(req.args, dict):
+        missing = [p for p in expected_params if p not in req.args]
+        if missing:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Missing arguments for method '{target_method}': {missing}. Expected: {expected_params}."
+            )
+    else:
+        raise HTTPException(status_code=422, detail="Arguments must be a list or dictionary.")
+
+    # 6. Execution
+    max_trace = 5000
+    if variant == "both":
+        res = run_both(analysis, target_method, req.args, include_trace=bool(req.include_trace), max_steps=1_000_000)
+    else:
+        quads = analysis.get("intermediate_code" if variant == "raw" else "optimized_code", [])
+        interp = TACInterpreter(quads, param_map=param_map, max_steps=1_000_000)
+        res = interp.run(target_method, req.args, variant=variant, trace=bool(req.include_trace), max_trace=max_trace)
+
+    # 7. Optional artifact persistence
+    artifact = None
+    if req.save_artifact:
+        step_val = res.get("step_count", res.get("optimized", {}).get("step_count", 0))
+        artifact = artifact_store.create_artifact(
+            artifact_type="tac_execution_trace",
+            payload=res,
+            title=f"TAC Trace: {target_method} ({variant})",
+            engine="compiler",
+            source_name=analysis.get("file_name", "source.java"),
+            summary=f"TAC execution of {target_method} ({variant} variant). Steps: {step_val}."
+        )
+
+    return {
+        "result": res,
+        "artifact": artifact
+    }
+
 # --- Data Endpoints ---
 @router.post("/data/profile")
 def profile_dataset(req: DataProfileRequest):
@@ -243,8 +369,9 @@ def export_data_artifact(artifact_id: str):
     return Response(content=res["bytes"], media_type=res["content_type"], headers={"Content-Disposition": f"attachment; filename={res['filename']}"})
 
 # --- ML Endpoints ---
-@router.post("/ml/train")
+@router.post("/ml/train", summary="Train ML model with multi-model comparison")
 def train_ml_model(req: MLTrainRequest):
+    """Train and evaluate models for classification, regression, or clustering (kmeans, mean_shift)."""
     try:
         res = ml_service.train_and_compare(
             csv_text=req.csv_text,
@@ -268,8 +395,11 @@ def train_ml_model(req: MLTrainRequest):
             summary=f"Trained {req.model_name} ({req.task_type}). Performance score: {score_val:.4f}"
         )
 
+    # Strip non-JSON-serializable Python references (*_ref) from direct HTTP response
+    clean_res = {k: v for k, v in res.items() if not k.endswith("_ref")}
+
     return {
-        "ml_result": res,
+        "ml_result": clean_res,
         "artifact": artifact
     }
 
@@ -279,7 +409,12 @@ def predict_instance(req: MLPredictRequest):
     if not art or art["artifact_type"] != "ml_model_result":
         raise HTTPException(status_code=404, detail="ML model result artifact not found.")
 
-    res = ml_service.predict_instance(art["payload"], req.instance_data)
+    payload = dict(art["payload"])
+    refs = artifact_store.get_model_refs(req.ml_artifact_id)
+    if refs:
+        payload.update(refs)
+
+    res = ml_service.predict_instance(payload, req.instance_data)
     if not res.get("prediction_available"):
         raise HTTPException(status_code=400, detail=res.get("error"))
 

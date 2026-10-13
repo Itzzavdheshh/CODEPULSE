@@ -47,7 +47,10 @@ class MLService:
                 "dataset_size": prep["dataset_size"],
                 "evaluation": eval_res,
                 "feature_importances": imps,
-                "selected_model_rationale": "K-Means selected for unsupervised spatial clustering."
+                "selected_model_rationale": f"'{primary_model_name.upper()}' selected for unsupervised spatial clustering.",
+                "trained_model_ref": model,
+                "scaler_ref": prep.get("scaler"),
+                "encoders_ref": prep.get("encoders", {})
             }
 
         # Multi-Model Candidates
