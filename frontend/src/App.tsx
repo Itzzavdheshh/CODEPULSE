@@ -4,13 +4,14 @@ import { Sidebar } from './components/Sidebar';
 import { CompilerStudio } from './components/CompilerStudio';
 import { AIModule } from './components/AIModule';
 import { VisualModule } from './components/VisualModule';
+import { GrowthLabStudio } from './components/growth/GrowthLabStudio';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { CodePulseArtifact } from './types';
 import { fetchArtifacts } from './services/api';
 import { Terminal } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeModule, setActiveModule] = useState<'compiler' | 'ai' | 'visual'>('compiler');
+  const [activeModule, setActiveModule] = useState<'compiler' | 'ai' | 'visual' | 'growth'>('compiler');
   const [engineerMode, setEngineerMode] = useState<boolean>(false);
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false);
   const [selectedWorkspace, setSelectedWorkspace] = useState<string>('PaymentSystem');
@@ -32,6 +33,8 @@ export const App: React.FC = () => {
   const handleGlobalSearchNavigate = (dest: string) => {
     if (dest === 'compiler' || dest === 'home') {
       setActiveModule('compiler');
+    } else if (dest === 'growth') {
+      setActiveModule('growth');
     } else if (dest === 'data' || dest === 'ml') {
       setActiveModule('ai');
     } else {
@@ -82,6 +85,7 @@ export const App: React.FC = () => {
 
         <main className="main-content" style={{ flex: 1, minWidth: 0, padding: '24px 32px', maxWidth: '100%' }}>
           {activeModule === 'compiler' && <CompilerStudio />}
+          {activeModule === 'growth' && <GrowthLabStudio />}
           {activeModule === 'ai' && <AIModule />}
           {activeModule === 'visual' && <VisualModule />}
         </main>

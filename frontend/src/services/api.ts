@@ -1,4 +1,12 @@
-import { CompilerAnalysis, DataProfile, MLResult, CodePulseArtifact } from '../types';
+import {
+  CompilerAnalysis,
+  DataProfile,
+  MLResult,
+  CodePulseArtifact,
+  GrowthInspectResponse,
+  GrowthLabResponse,
+  GrowthLabRequestPayload,
+} from '../types';
 
 const API_BASE = '/api/v1';
 
@@ -388,4 +396,39 @@ export async function loadExampleCompilerAnalysis(): Promise<any> {
   const res = await analyzeCompilerSource(sampleCode, "SoftwareRiskAnalyzer.java");
   return res.artifact || { payload: res.analysis, source_name: "SoftwareRiskAnalyzer.java", title: "Compiler Analysis of SoftwareRiskAnalyzer.java" };
 }
+
+export async function inspectGrowthSource(
+  sourceCode: string,
+  signal?: AbortSignal
+): Promise<GrowthInspectResponse> {
+  const res = await fetch(`${API_BASE}/compiler/growth-lab/inspect`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ source_code: sourceCode }),
+    signal
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Source inspection failed');
+  }
+  return res.json();
+}
+
+export async function runGrowthAnalysis(
+  payload: GrowthLabRequestPayload,
+  signal?: AbortSignal
+): Promise<GrowthLabResponse> {
+  const res = await fetch(`${API_BASE}/compiler/growth-lab`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.detail || 'Growth analysis failed');
+  }
+  return res.json();
+}
+
 

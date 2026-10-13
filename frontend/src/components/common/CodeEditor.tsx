@@ -13,6 +13,7 @@ interface CodeEditorProps {
   isLoading?: boolean;
   onSelectLine?: (line: number) => void;
   selectedLine?: number | null;
+  theme?: 'dark' | 'light';
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -25,8 +26,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onSave,
   isLoading = false,
   onSelectLine,
-  selectedLine
+  selectedLine,
+  theme = 'dark'
 }) => {
+  const isLight = theme === 'light';
   const [copied, setCopied] = useState(false);
   const [saveToast, setSaveToast] = useState(false);
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
@@ -112,14 +115,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
   return (
     <div style={{
-      border: '1px solid var(--border-light)',
-      borderRadius: 'var(--radius-lg)',
-      background: '#0F172A',
-      color: '#F8FAFC',
+      border: isLight ? '1px solid var(--border-light, #CBD5E1)' : '1px solid var(--border-light)',
+      borderRadius: 'var(--radius-lg, 12px)',
+      background: isLight ? '#FFFFFF' : '#0F172A',
+      color: isLight ? '#0F172A' : '#F8FAFC',
       overflow: 'hidden',
       display: 'flex',
       flexDirection: 'column',
-      boxShadow: 'var(--shadow-md)'
+      boxShadow: isLight ? 'var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.05))' : 'var(--shadow-md)'
     }}>
       {/* Editor Header Bar */}
       <div style={{
@@ -127,19 +130,33 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '10px 16px',
-        background: '#1E293B',
-        borderBottom: '1px solid #334155'
+        background: isLight ? 'var(--bg-inset, #F8FAFC)' : '#1E293B',
+        borderBottom: isLight ? '1px solid var(--border-light, #E2E8F0)' : '1px solid #334155'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <FileCode size={16} color="#818CF8" />
-          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#F8FAFC', fontFamily: 'var(--font-mono)' }}>
+          <FileCode size={16} color={isLight ? '#4F46E5' : '#818CF8'} />
+          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isLight ? '#0F172A' : '#F8FAFC', fontFamily: 'var(--font-mono)' }}>
             {fileName}
           </span>
-          <span style={{ fontSize: '0.72rem', background: '#334155', color: '#94A3B8', padding: '2px 8px', borderRadius: '4px' }}>
+          <span style={{
+            fontSize: '0.72rem',
+            background: isLight ? '#E2E8F0' : '#334155',
+            color: isLight ? '#475569' : '#94A3B8',
+            padding: '2px 8px',
+            borderRadius: '4px',
+            fontWeight: 600
+          }}>
             {lines.length} LOC
           </span>
           {saveToast && (
-            <span style={{ fontSize: '0.72rem', color: '#34D399', background: 'rgba(52, 211, 153, 0.15)', padding: '2px 8px', borderRadius: '4px' }}>
+            <span style={{
+              fontSize: '0.72rem',
+              color: '#059669',
+              background: isLight ? '#ECFDF5' : 'rgba(52, 211, 153, 0.15)',
+              padding: '2px 8px',
+              borderRadius: '4px',
+              fontWeight: 600
+            }}>
               ✓ Saved
             </span>
           )}
@@ -150,7 +167,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             <button
               onClick={handleSaveInternal}
               className="btn btn-secondary btn-sm"
-              style={{ background: '#334155', color: '#F8FAFC', border: 'none' }}
+              style={{
+                background: isLight ? '#FFFFFF' : '#334155',
+                color: isLight ? '#334155' : '#F8FAFC',
+                border: isLight ? '1px solid #CBD5E1' : 'none',
+                boxShadow: isLight ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+              }}
               title="Save Source (Ctrl+S)"
             >
               <Save size={14} />
@@ -161,10 +183,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           <button
             onClick={handleCopy}
             className="btn btn-secondary btn-sm"
-            style={{ background: '#334155', color: '#F8FAFC', border: 'none' }}
+            style={{
+              background: isLight ? '#FFFFFF' : '#334155',
+              color: isLight ? '#334155' : '#F8FAFC',
+              border: isLight ? '1px solid #CBD5E1' : 'none',
+              boxShadow: isLight ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
+            }}
             title="Copy Source"
           >
-            {copied ? <Check size={14} color="#34D399" /> : <Copy size={14} />}
+            {copied ? <Check size={14} color="#059669" /> : <Copy size={14} />}
             <span>{copied ? 'Copied' : 'Copy'}</span>
           </button>
 
@@ -275,29 +302,56 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           })}
         </div>
       ) : (
-        <div style={{ position: 'relative', display: 'grid', gridTemplateColumns: '64px minmax(0, 1fr)', minHeight: '420px', background: '#0F172A' }}>
+        <div style={{
+          position: 'relative',
+          display: 'grid',
+          gridTemplateColumns: '64px minmax(0, 1fr)',
+          minHeight: '420px',
+          background: isLight ? '#FFFFFF' : '#0F172A'
+        }}>
           {searchOpen && (
-            <div style={{ position: 'absolute', right: 12, top: 12, zIndex: 3, display: 'flex', alignItems: 'center', gap: 6, background: '#111827', border: '1px solid #334155', borderRadius: 6, padding: '6px 8px' }}>
-              <Search size={14} color="#94A3B8" />
+            <div style={{
+              position: 'absolute',
+              right: 12,
+              top: 12,
+              zIndex: 3,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: isLight ? '#FFFFFF' : '#111827',
+              border: isLight ? '1px solid #CBD5E1' : '1px solid #334155',
+              borderRadius: 6,
+              padding: '6px 8px',
+              boxShadow: isLight ? '0 4px 12px rgba(0,0,0,0.08)' : 'none'
+            }}>
+              <Search size={14} color={isLight ? '#64748B' : '#94A3B8'} />
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Find"
                 autoFocus
-                style={{ width: 160, background: 'transparent', border: 0, outline: 0, color: '#E2E8F0', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}
+                style={{
+                  width: 160,
+                  background: 'transparent',
+                  border: 0,
+                  outline: 0,
+                  color: isLight ? '#0F172A' : '#E2E8F0',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: '0.78rem'
+                }}
               />
               <button
                 type="button"
                 aria-label="Close search"
                 onClick={() => setSearchOpen(false)}
-                style={{ background: 'transparent', border: 0, color: '#94A3B8', cursor: 'pointer', display: 'flex' }}
+                style={{ background: 'transparent', border: 0, color: isLight ? '#64748B' : '#94A3B8', cursor: 'pointer', display: 'flex' }}
               >
                 <X size={14} />
               </button>
             </div>
           )}
 
-          {/* Active Line Highlight overlay box (matching IDE current line highlight line) */}
+          {/* Active Line Highlight overlay box */}
           <div
             style={{
               position: 'absolute',
@@ -305,9 +359,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               left: 0,
               right: 0,
               height: '22.4px',
-              background: 'rgba(255, 255, 255, 0.04)',
-              borderTop: '1px solid rgba(255, 255, 255, 0.12)',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.12)',
+              background: isLight ? 'rgba(79, 70, 229, 0.05)' : 'rgba(255, 255, 255, 0.04)',
+              borderTop: isLight ? '1px solid rgba(79, 70, 229, 0.15)' : '1px solid rgba(255, 255, 255, 0.12)',
+              borderBottom: isLight ? '1px solid rgba(79, 70, 229, 0.15)' : '1px solid rgba(255, 255, 255, 0.12)',
               pointerEvents: 'none',
               zIndex: 1
             }}
@@ -318,13 +372,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             aria-hidden="true"
             style={{
               overflow: 'hidden',
-              borderRight: '1px solid #1E293B',
+              borderRight: isLight ? '1px solid #E2E8F0' : '1px solid #1E293B',
               padding: '16px 0',
-              background: '#0B1020',
+              background: isLight ? '#F8FAFC' : '#0B1020',
               fontFamily: 'var(--font-mono)',
               fontSize: '0.875rem',
               lineHeight: '1.6',
-              color: '#64748B',
+              color: isLight ? '#94A3B8' : '#64748B',
               userSelect: 'none',
               position: 'relative',
               zIndex: 2
@@ -343,9 +397,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                     lineHeight: '1.6',
                     padding: '0 10px',
                     textAlign: 'right',
-                    borderLeft: hasDiag ? '3px solid #EF4444' : isSelected ? '3px solid #6366F1' : '3px solid transparent',
-                    background: isSelected ? 'rgba(99, 102, 241, 0.14)' : 'transparent',
-                    color: isSelected ? '#F8FAFC' : '#64748B',
+                    borderLeft: hasDiag ? '3px solid #EF4444' : isSelected ? '3px solid #4F46E5' : '3px solid transparent',
+                    background: isSelected ? (isLight ? 'rgba(79, 70, 229, 0.1)' : 'rgba(99, 102, 241, 0.14)') : 'transparent',
+                    color: isSelected ? (isLight ? '#4338CA' : '#F8FAFC') : (isLight ? '#94A3B8' : '#64748B'),
                     fontWeight: isSelected ? 700 : 400,
                     cursor: 'pointer'
                   }}
@@ -380,8 +434,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               whiteSpace: 'pre',
               overflow: 'auto',
               tabSize: 4,
-              background: 'transparent',
-              caretColor: '#818cf8',
+              background: isLight ? '#FFFFFF' : 'transparent',
+              color: isLight ? '#0F172A' : '#F8FAFC',
+              caretColor: isLight ? '#4338CA' : '#818cf8',
               position: 'relative',
               zIndex: 2
             }}
@@ -396,10 +451,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '6px 16px',
-        background: '#070A11',
-        borderTop: '1px solid #1E293B',
+        background: isLight ? '#F8FAFC' : '#070A11',
+        borderTop: isLight ? '1px solid #E2E8F0' : '1px solid #1E293B',
         fontSize: '0.75rem',
-        color: '#64748B',
+        color: isLight ? '#64748B' : '#64748B',
         fontFamily: 'var(--font-mono)'
       }}>
         <div style={{ display: 'flex', gap: '16px' }}>

@@ -10,6 +10,7 @@ from app.compiler.service import CompilerService
 from app.compiler.grammar import GrammarAnalyzer
 from app.compiler.project import MultiFileProjectAnalyzer
 from app.compiler.interpreter import extract_param_map, TACInterpreter, run_both
+from app.compiler.growth_lab import inspect_source, analyze_growth
 from app.data.service import DataService
 from app.ml.service import MLService
 from app.artifacts.store import ArtifactStore
@@ -42,6 +43,18 @@ class CompilerInterpretRequest(BaseModel):
     args: Union[List[Any], Dict[str, Any]]
     variant: Optional[str] = "optimized"
     include_trace: Optional[bool] = False
+    save_artifact: Optional[bool] = False
+
+class GrowthLabInspectRequest(BaseModel):
+    source_code: str
+
+class GrowthLabRequest(BaseModel):
+    source_code: str
+    method: str
+    size_param: Union[str, int]
+    fixed_args: Optional[Dict[str, Any]] = None
+    sizes: Optional[List[int]] = None
+    variant: Optional[str] = "optimized"
     save_artifact: Optional[bool] = False
 
 class GrammarAnalysisRequest(BaseModel):
@@ -324,6 +337,86 @@ def interpret_compiler_tac(req: CompilerInterpretRequest):
         "result": res,
         "artifact": artifact
     }
+
+# --- Growth Lab Endpoints ---
+@router.post("/compiler/growth-lab/inspect")
+def inspect_growth_source_endpoint(req: GrowthLabInspectRequest):
+    if not req.source_code:
+        raise HTTPException(status_code=422, detail="source_code is required.")
+    return inspect_source(req.source_code)
+
+@router.post("/compiler/growth-lab")
+def run_growth_lab_endpoint(req: GrowthLabRequest):
+    if not req.source_code or not req.source_code.strip():
+        raise HTTPException(status_code=422, detail="source_code is required.")
+    if not req.method or not req.method.strip():
+        raise HTTPException(status_code=422, detail="method name is required.")
+    if req.size_param is None or (isinstance(req.size_param, str) and not req.size_param.strip()):
+        raise HTTPException(status_code=422, detail="size_param is required.")
+
+    # Validate variant
+    variant = (req.variant or "optimized").lower()
+    if variant not in ("raw", "optimized", "both"):
+        raise HTTPException(status_code=422, detail="variant must be 'raw', 'optimized', or 'both'.")
+
+    # Validate sizes
+    if req.sizes is not None:
+        if not isinstance(req.sizes, list):
+            raise HTTPException(status_code=422, detail="sizes must be a list of integers.")
+        if len(req.sizes) > 40:
+            raise HTTPException(status_code=422, detail="sizes list exceeds maximum limit of 40 values.")
+        for s in req.sizes:
+            if not isinstance(s, int) or isinstance(s, bool) or s <= 0 or s > 100_000:
+                raise HTTPException(status_code=422, detail=f"Each size must be a positive integer <= 100000 (got {s}).")
+
+    # Validate fixed_args
+    if req.fixed_args is not None:
+        if not isinstance(req.fixed_args, dict):
+            raise HTTPException(status_code=422, detail="fixed_args must be a dictionary.")
+        for k, v in req.fixed_args.items():
+            if not isinstance(v, (int, float)) or isinstance(v, bool) or math.isnan(v) or math.isinf(v):
+                raise HTTPException(status_code=422, detail=f"fixed_args['{k}'] must be a finite numeric value.")
+
+    try:
+        result = analyze_growth(
+            source_code=req.source_code,
+            method=req.method,
+            size_param=req.size_param,
+            fixed_args=req.fixed_args,
+            sizes=req.sizes,
+            variant=variant,
+            max_steps_per_run=300_000,
+            time_budget_s=5.0
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    # Optional artifact persistence
+    if req.save_artifact:
+        classification = result.get("fit", {}).get("classification", "Unknown")
+        confidence = result.get("fit", {}).get("confidence", "low")
+        artifact = artifact_store.create_artifact(
+            artifact_type="growth_analysis",
+            payload={
+                "method": req.method,
+                "size_param": str(req.size_param),
+                "variant": variant,
+                "samples": result.get("samples", []),
+                "fit": result.get("fit", {}),
+                "static_hint": result.get("static_hint", {}),
+                "variants": result.get("variants"),
+                "truncated_reason": result.get("truncated_reason")
+            },
+            title=f"Growth Analysis: {req.method} ({classification})",
+            engine="compiler",
+            source_name="source.java",
+            summary=f"Algorithmic growth analysis for {req.method}: {classification} ({confidence} confidence)."
+        )
+        result["artifact"] = artifact
+
+    return result
 
 # --- Data Endpoints ---
 @router.post("/data/profile")

@@ -217,3 +217,113 @@ export interface CodePulseArtifact {
   metadata: { title: string; source_file: string; summary: string };
   payload: any;
 }
+
+// ==========================================
+// Growth Lab Types
+// ==========================================
+
+export interface GrowthMethodParam {
+  name: string;
+  type: string;
+}
+
+export interface GrowthMethodInfo {
+  name: string;
+  params: GrowthMethodParam[];
+  return_type: string;
+}
+
+export interface GrowthInspectResponse {
+  ok: boolean;
+  diagnostics: Array<{
+    stage?: string;
+    severity?: string;
+    message: string;
+    line?: number;
+    column?: number;
+  }>;
+  methods: GrowthMethodInfo[];
+}
+
+export interface GrowthSample {
+  n: number;
+  steps: number;
+  status: string;
+  return_value: any;
+}
+
+export interface GrowthCandidate {
+  basis: string;
+  a: number;
+  b: number;
+  r2: number;
+  max_relative_error: number;
+}
+
+export interface DoublingRatio {
+  from_n: number;
+  to_n: number;
+  ratio: number;
+}
+
+export interface GrowthFit {
+  classification: string;
+  confidence: 'high' | 'medium' | 'low';
+  formula: string;
+  r2: number;
+  max_relative_error: number;
+  log_log_slope: number;
+  doubling_ratios: DoublingRatio[];
+  candidates: GrowthCandidate[];
+  notes: string[];
+  valid_points_count: number;
+}
+
+export interface GrowthStaticHint {
+  loop_depth: number;
+  has_recursion: boolean;
+  hint_class: string;
+}
+
+export interface GrowthVariantComparison {
+  classes_match: boolean;
+  steps_saved_at_largest_n: number;
+  steps_saved_pct: number;
+  largest_n: number;
+}
+
+export interface GrowthVariants {
+  raw: {
+    samples: GrowthSample[];
+    fit: GrowthFit;
+    truncated_reason?: string | null;
+  };
+  optimized: {
+    samples: GrowthSample[];
+    fit: GrowthFit;
+    truncated_reason?: string | null;
+  };
+  comparison: GrowthVariantComparison;
+}
+
+export interface GrowthLabResponse {
+  samples: GrowthSample[];
+  fit: GrowthFit;
+  static_hint: GrowthStaticHint;
+  variants?: GrowthVariants;
+  truncated_reason?: string | null;
+  cost_model: string;
+  elapsed_ms: number;
+  artifact?: CodePulseArtifact;
+}
+
+export interface GrowthLabRequestPayload {
+  source_code: string;
+  method: string;
+  size_param: string | number;
+  fixed_args?: Record<string, any>;
+  sizes?: number[];
+  variant?: 'raw' | 'optimized' | 'both';
+  save_artifact?: boolean;
+}
+

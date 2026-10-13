@@ -1,9 +1,9 @@
 import React from 'react';
-import { Cpu, Brain, Eye, Settings, Terminal, Shield, ArrowLeftRight } from 'lucide-react';
+import { Cpu, Brain, Eye, Settings, Terminal, Shield, ArrowLeftRight, LineChart } from 'lucide-react';
 
 interface SidebarProps {
-  activeModule: 'compiler' | 'ai' | 'visual';
-  onSelectModule: (module: 'compiler' | 'ai' | 'visual') => void;
+  activeModule: 'compiler' | 'ai' | 'visual' | 'growth';
+  onSelectModule: (module: 'compiler' | 'ai' | 'visual' | 'growth') => void;
   engineerMode: boolean;
   onToggleEngineerMode: () => void;
 }
@@ -20,6 +20,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Compiler',
       tooltip: 'Compiler Intelligence (AST, IR, CFG, Metrics)',
       icon: Cpu,
+    },
+    {
+      id: 'growth' as const,
+      label: 'Growth Lab',
+      tooltip: 'Measure how your code grows',
+      icon: LineChart,
     },
     {
       id: 'ai' as const,
