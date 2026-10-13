@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { FileText, Download, Play, CheckCircle, Copy, Sparkles, Layers } from 'lucide-react';
+import { FileText, Download, Play, CheckCircle2, Copy, Sparkles, Layers, Printer } from 'lucide-react';
 import { generateReport, fetchArtifacts } from '../services/api';
 import { CodePulseArtifact } from '../types';
+import { MetricCard } from './common/MetricCard';
 
 export const ReportsStudio: React.FC = () => {
   const [reportMarkdown, setReportMarkdown] = useState<string>('');
@@ -55,98 +56,132 @@ export const ReportsStudio: React.FC = () => {
     a.click();
   };
 
+  const handlePrint = () => {
+    window.print();
+  };
+
   const compilerOptions = artifacts.filter(a => a.artifact_type === 'compiler_analysis');
   const dataOptions = artifacts.filter(a => a.artifact_type === 'data_profile');
   const mlOptions = artifacts.filter(a => a.artifact_type === 'ml_model_result');
 
   return (
-    <div>
-      {/* Banner */}
-      <div className="glass-panel" style={{ marginBottom: '24px', background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(245, 158, 11, 0.15))' }}>
+    <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
+      {/* Top Banner Header */}
+      <div className="cp-card" style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
           <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: '#FFF', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FileText size={22} color="#F59E0B" /> Executive & Technical Reporting Studio
-            </h2>
-            <p style={{ color: '#94A3B8', fontSize: '0.88rem', marginTop: '4px' }}>
-              Synthesizes Compiler AST/Metrics, Data Profiling, and Machine Learning results into structured Markdown & PDF documents.
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span className="badge badge-info">EXECUTIVE & TECHNICAL REPORTING</span>
+              <span className="badge badge-low">CROSS-ENGINE SYNTHESIS</span>
+            </div>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>
+              Executive &amp; Technical Reporting Studio
+            </h1>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+              Synthesize compiler metrics, dataset profiles, and machine learning risk predictions into an executive report.
             </p>
           </div>
-          <button className="btn btn-primary" onClick={handleGenerate} disabled={loading} style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }}>
+
+          <button className="btn btn-primary" onClick={handleGenerate} disabled={loading}>
             <Play size={16} />
-            {loading ? 'Generating Report...' : 'Compile Integrated Report'}
+            {loading ? 'Compiling Report...' : 'Compile Integrated Report'}
           </button>
         </div>
       </div>
 
-      <div className="grid-2" style={{ alignItems: 'start' }}>
-        {/* Left Column: Artifact Source Selection */}
-        <div className="glass-panel">
-          <span className="panel-title">
-            <Layers size={18} color="#F59E0B" />
-            Synthesize Artifacts Into Report
-          </span>
+      {/* Main Grid: Artifact Synthesis Selector Left vs Report Document Preview Right */}
+      <div className="grid-2" style={{ alignItems: 'start', marginBottom: '24px' }}>
+        {/* Left Column: Artifact Source Controls */}
+        <div className="cp-card">
+          <h2 className="panel-title">
+            <Layers size={18} color="var(--brand-primary)" />
+            Synthesize Artifact Sources
+          </h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '16px' }}>
             <div>
-              <label style={{ fontSize: '0.82rem', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Compiler Analysis Artifact</label>
-              <select value={selectedCompilerId} onChange={(e) => setSelectedCompilerId(e.target.value)} style={{ width: '100%', background: '#0F172A', border: '1px solid var(--border-color)', color: '#FFF', padding: '8px', borderRadius: '6px', fontSize: '0.82rem' }}>
-                <option value="">-- None (Synthesize Active Engine) --</option>
+              <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Compiler Analysis Artifact</label>
+              <select value={selectedCompilerId} onChange={(e) => setSelectedCompilerId(e.target.value)} className="cp-select" style={{ width: '100%' }}>
+                <option value="">-- Active Compiler Run --</option>
                 {compilerOptions.map(a => <option key={a.artifact_id} value={a.artifact_id}>{a.metadata.title} ({a.artifact_id.slice(0, 8)})</option>)}
               </select>
             </div>
 
             <div>
-              <label style={{ fontSize: '0.82rem', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>Data Profile Artifact</label>
-              <select value={selectedDataId} onChange={(e) => setSelectedDataId(e.target.value)} style={{ width: '100%', background: '#0F172A', border: '1px solid var(--border-color)', color: '#FFF', padding: '8px', borderRadius: '6px', fontSize: '0.82rem' }}>
-                <option value="">-- None (Synthesize Active Engine) --</option>
+              <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Data Profile Artifact</label>
+              <select value={selectedDataId} onChange={(e) => setSelectedDataId(e.target.value)} className="cp-select" style={{ width: '100%' }}>
+                <option value="">-- Active Data Profile --</option>
                 {dataOptions.map(a => <option key={a.artifact_id} value={a.artifact_id}>{a.metadata.title} ({a.artifact_id.slice(0, 8)})</option>)}
               </select>
             </div>
 
             <div>
-              <label style={{ fontSize: '0.82rem', color: '#94A3B8', display: 'block', marginBottom: '4px' }}>ML Model Result Artifact</label>
-              <select value={selectedMlId} onChange={(e) => setSelectedMlId(e.target.value)} style={{ width: '100%', background: '#0F172A', border: '1px solid var(--border-color)', color: '#FFF', padding: '8px', borderRadius: '6px', fontSize: '0.82rem' }}>
-                <option value="">-- None (Synthesize Active Engine) --</option>
+              <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>ML Model Result Artifact</label>
+              <select value={selectedMlId} onChange={(e) => setSelectedMlId(e.target.value)} className="cp-select" style={{ width: '100%' }}>
+                <option value="">-- Active ML Model --</option>
                 {mlOptions.map(a => <option key={a.artifact_id} value={a.artifact_id}>{a.metadata.title} ({a.artifact_id.slice(0, 8)})</option>)}
               </select>
             </div>
           </div>
 
-          <button className="btn btn-primary" onClick={handleGenerate} disabled={loading} style={{ width: '100%', justifyContent: 'center', background: 'linear-gradient(135deg, #F59E0B, #D97706)', padding: '12px' }}>
-            <Sparkles size={16} />
-            {loading ? 'Synthesizing Engines...' : 'Generate Comprehensive Markdown Report'}
+          <button className="btn btn-primary" onClick={handleGenerate} disabled={loading} style={{ width: '100%' }}>
+            <FileText size={16} /> Generate Executive Report
           </button>
         </div>
 
-        {/* Right Column: Rendered Markdown Report */}
-        <div className="glass-panel">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <span className="panel-title" style={{ margin: 0 }}>
-              <FileText size={18} color="#F59E0B" />
-              Generated Report
-            </span>
+        {/* Right Column: Professional Report Preview */}
+        <div className="cp-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 className="panel-title" style={{ margin: 0 }}>Report Document Preview</h2>
+
             {reportMarkdown && (
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button className="btn btn-secondary" style={{ fontSize: '0.78rem', padding: '4px 10px' }} onClick={handleCopy}>
-                  <Copy size={14} /> {copied ? 'Copied ✓' : 'Copy'}
+                <button className="btn btn-secondary btn-sm" onClick={handleCopy}>
+                  {copied ? <CheckCircle2 size={14} color="var(--color-emerald)" /> : <Copy size={14} />}
+                  <span>{copied ? 'Copied' : 'Copy'}</span>
                 </button>
-                <button className="btn btn-outline" style={{ fontSize: '0.78rem', padding: '4px 10px' }} onClick={handleDownload}>
-                  <Download size={14} /> Download .md
+                <button className="btn btn-secondary btn-sm" onClick={handleDownload}>
+                  <Download size={14} /> Markdown
+                </button>
+                <button className="btn btn-secondary btn-sm" onClick={handlePrint}>
+                  <Printer size={14} /> Print / PDF
                 </button>
               </div>
             )}
           </div>
 
-          {reportMarkdown ? (
-            <div style={{ background: '#0B0F19', padding: '20px', borderRadius: '8px', border: '1px solid var(--border-color)', maxHeight: '520px', overflowY: 'auto', whiteSpace: 'pre-wrap', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#CBD5E1', lineHeight: 1.6 }}>
-              {reportMarkdown}
+          {!reportMarkdown ? (
+            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+              <FileText size={48} color="var(--border-subtle)" style={{ marginBottom: '12px' }} />
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>No Report Generated Yet</h3>
+              <p style={{ fontSize: '0.85rem', marginTop: '4px', maxWidth: '360px', margin: '4px auto 0 auto' }}>
+                Click 'Compile Integrated Report' to synthesize selected artifacts into a Markdown &amp; PDF document.
+              </p>
             </div>
           ) : (
-            <div style={{ textAlign: 'center', padding: '80px 20px', color: '#64748B' }}>
-              <FileText size={48} color="#334155" style={{ marginBottom: '12px' }} />
-              <h3 style={{ color: '#94A3B8', fontWeight: 600 }}>No Report Generated Yet</h3>
-              <p style={{ fontSize: '0.88rem', marginTop: '6px' }}>Select input artifacts and click "Generate Comprehensive Markdown Report".</p>
+            <div style={{
+              background: 'var(--bg-subtle)',
+              border: '1px solid var(--border-light)',
+              borderRadius: 'var(--radius-md)',
+              padding: '24px',
+              fontFamily: 'var(--font-sans)',
+              maxHeight: '520px',
+              overflowY: 'auto',
+              lineHeight: '1.6'
+            }}>
+              <div style={{ borderBottom: '2px solid var(--brand-primary)', paddingBottom: '12px', marginBottom: '16px' }}>
+                <span className="badge badge-info">CODEPULSE EXECUTIVE REPORT</span>
+                <h1 style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)', marginTop: '4px' }}>
+                  Software Intelligence &amp; Quality Audit Report
+                </h1>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Generated on {new Date().toLocaleDateString()} | Workspace: PaymentSystem
+                </p>
+              </div>
+
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', whiteSpace: 'pre-wrap', color: 'var(--text-primary)' }}>
+                {reportMarkdown}
+              </div>
             </div>
           )}
         </div>

@@ -61,12 +61,31 @@ class SemanticAnalyzer:
         else:
             self.all_symbols.append(sym.to_dict())
 
+        # Pass 1: Declare all fields and methods in class symbol table
         for field in node.fields:
-            self.visit(field, class_table)
+            f_sym = Symbol(field.name, "field", field.data_type, class_table.scope_name, field.line)
+            class_table.define(f_sym)
+            self.all_symbols.append(f_sym.to_dict())
+
         for method in node.methods:
-            self.visit(method, class_table)
+            m_sym = Symbol(method.name, "method", method.return_type, class_table.scope_name, method.line)
+            class_table.define(m_sym)
+            self.all_symbols.append(m_sym.to_dict())
+
+        # Pass 2: Analyze method bodies and field initializers
+        for field in node.fields:
+            if field.initializer:
+                self.visit(field.initializer, class_table)
+        for method in node.methods:
+            method_table = SymbolTable(f"method:{method.name}", class_table)
+            for p in method.params:
+                p_sym = Symbol(p["name"], "variable", p["type"], method_table.scope_name, method.line)
+                method_table.define(p_sym)
+                self.all_symbols.append(p_sym.to_dict())
+            self.visit(method.body, method_table)
 
     def visit_MethodDeclaration(self, node: MethodNode, table: SymbolTable):
+        # Fallback single visit if called independently
         method_table = SymbolTable(f"method:{node.name}", table)
         sym = Symbol(node.name, "method", node.return_type, table.scope_name, node.line)
         table.define(sym)
@@ -182,4 +201,13 @@ class SemanticAnalyzer:
 
         if left_t == "float" or right_t == "float":
             return "float"
+        return "int"
+
+    def visit_MethodCall(self, node: MethodCallNode, table: SymbolTable) -> str:
+        sym = table.lookup(node.name)
+        for arg in node.arguments:
+            self.visit(arg, table)
+        if sym:
+            return sym.data_type
+        # Builtin methods or default
         return "int"

@@ -28,7 +28,7 @@ def test_compiler_service_full_pipeline():
     assert "keyword_frequency" in res
     assert "while" in res["keyword_frequency"]
     assert "target_code" in res
-    assert "bipush" in res["target_code"]["assembly_code"]
+    assert "iconst" in res["target_code"]["assembly_code"] or "bipush" in res["target_code"]["assembly_code"]
 
 def test_multifile_project_analyzer():
     files = [

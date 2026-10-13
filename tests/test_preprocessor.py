@@ -17,6 +17,24 @@ def test_preprocessor_comment_stripping():
     assert "http://example.com//not_a_comment" in res["cleaned_source"]
     assert "This is a single line comment" not in res["cleaned_source"]
 
+def test_preprocessor_strings_containing_comment_chars():
+    prep = Preprocessor()
+    code = """
+    String url = "https://example.com";
+    String text = "hello // world";
+    String value = "/* not a comment */";
+    // Real comment line
+    """
+    res = prep.preprocess(code)
+    stats = res["comment_stats"]
+
+    assert stats["single_line_comments_count"] == 1
+    assert stats["block_comments_count"] == 0
+    assert 'String url = "https://example.com";' in res["cleaned_source"]
+    assert 'String text = "hello // world";' in res["cleaned_source"]
+    assert 'String value = "/* not a comment */";' in res["cleaned_source"]
+    assert "Real comment line" not in res["cleaned_source"]
+
 def test_preprocessor_macro_expansion():
     prep = Preprocessor()
     code = """

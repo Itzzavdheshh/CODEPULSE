@@ -123,3 +123,44 @@ class MethodCallNode(ASTNode):
         super().__init__("MethodCall", line, column)
         self.name = name
         self.arguments = arguments
+
+def count_ast_nodes(node: Any) -> int:
+    """Recursively counts total AST nodes in tree for both ASTNode objects and serialized dicts."""
+    if node is None:
+        return 0
+    if isinstance(node, ASTNode):
+        count = 1
+        for k, v in node.__dict__.items():
+            if k in ("node_type", "line", "column"):
+                continue
+            if isinstance(v, ASTNode):
+                count += count_ast_nodes(v)
+            elif isinstance(v, list):
+                for item in v:
+                    if isinstance(item, ASTNode):
+                        count += count_ast_nodes(item)
+                    elif isinstance(item, dict) and "node_type" in item:
+                        count += count_ast_nodes(item)
+            elif isinstance(v, dict) and "node_type" in v:
+                count += count_ast_nodes(v)
+        return count
+    elif isinstance(node, dict):
+        if "node_type" not in node:
+            return 0
+        count = 1
+        for k, v in node.items():
+            if k in ("node_type", "line", "column"):
+                continue
+            if isinstance(v, dict) and "node_type" in v:
+                count += count_ast_nodes(v)
+            elif isinstance(v, list):
+                for item in v:
+                    if isinstance(item, dict) and "node_type" in item:
+                        count += count_ast_nodes(item)
+                    elif isinstance(item, ASTNode):
+                        count += count_ast_nodes(item)
+            elif isinstance(v, ASTNode):
+                count += count_ast_nodes(v)
+        return count
+    return 0
+

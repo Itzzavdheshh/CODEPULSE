@@ -34,6 +34,12 @@ class Quadruple:
             return f"goto {self.result}"
         elif self.op == "IF_FALSE":
             return f"ifFalse {self.arg1} goto {self.result}"
+        elif self.op == "PARAM":
+            return f"PARAM {self.arg1}"
+        elif self.op == "CALL":
+            if self.result:
+                return f"CALL {self.arg1}, {self.arg2} -> {self.result}"
+            return f"CALL {self.arg1}, {self.arg2}"
         elif self.op == "PRINT":
             return f"print {self.arg1}"
         elif self.op == "RETURN":
@@ -191,3 +197,13 @@ class IRGenerator:
 
     def visit_Identifier(self, node: IdentifierNode) -> str:
         return node.name
+
+    def visit_MethodCall(self, node: MethodCallNode) -> str:
+        param_temps = []
+        for arg in node.arguments:
+            arg_temp = self.visit(arg)
+            param_temps.append(arg_temp)
+            self.quads.append(Quadruple("PARAM", arg_temp, "", "", line=node.line))
+        ret_temp = self.new_temp()
+        self.quads.append(Quadruple("CALL", node.name, str(len(node.arguments)), ret_temp, line=node.line))
+        return ret_temp

@@ -40,14 +40,18 @@ export interface CFGEdge {
   from: string;
   to: string;
   type: string;
+  label?: string;
 }
 
 export interface CompilerMetrics {
   total_loc: number;
   source_loc: number;
+  blank_loc?: number;
   comment_loc: number;
   cyclomatic_complexity: number;
   cognitive_complexity: number;
+  decision_points?: number;
+  method_complexities?: { name: string; cyclomatic_complexity: number; decision_points?: number }[];
   tokens_count: number;
   keywords_count: number;
   identifiers_count: number;
@@ -69,6 +73,8 @@ export interface PreprocessingData {
     removed_characters: number;
     comment_lines: number[];
   };
+  comments_removed?: number;
+  macros_defined?: number;
 }
 
 export interface TargetCodeData {
@@ -87,6 +93,7 @@ export interface CompilerAnalysis {
     lines: number;
     characters: number;
     tokens_count: number;
+    ast_nodes_count?: number;
     keywords_count: number;
     identifiers_count: number;
     diagnostics_count: number;
@@ -106,6 +113,27 @@ export interface CompilerAnalysis {
   cfg: {
     nodes: CFGNode[];
     edges: CFGEdge[];
+    methods?: Record<string, {
+      method_name: string;
+      nodes: CFGNode[];
+      edges: CFGEdge[];
+      cyclomatic_complexity: number;
+      decision_points: number;
+      instruction_count: number;
+      instructions_count: number;
+      loop_count: number;
+      connected_components?: number;
+      entry_block: string;
+      exit_block: string;
+    }>;
+    program_aggregate?: {
+      total_methods: number;
+      total_basic_blocks: number;
+      total_edges: number;
+      connected_components?: number;
+      program_aggregate_cyclomatic_complexity: number;
+      max_method_complexity: number;
+    };
   };
   target_code?: TargetCodeData;
   metrics: CompilerMetrics;
@@ -179,7 +207,6 @@ export interface MLResult {
   };
   feature_importances: { feature_name: string; importance: number }[];
 }
-
 
 export interface CodePulseArtifact {
   artifact_id: string;

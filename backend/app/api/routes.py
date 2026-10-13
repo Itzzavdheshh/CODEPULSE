@@ -1,6 +1,10 @@
 from fastapi import APIRouter, HTTPException, Response
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
+import pandas as pd
+import zipfile
+import base64
+import io
 from app.compiler.service import CompilerService
 from app.compiler.grammar import GrammarAnalyzer
 from app.compiler.project import MultiFileProjectAnalyzer
@@ -9,6 +13,7 @@ from app.ml.service import MLService
 from app.artifacts.store import ArtifactStore
 from app.core.workspace import WorkspaceManager
 from app.reports.generator import IntegratedReportGenerator
+from app.visualization.service import VisualizationService
 
 router = APIRouter(prefix="/api/v1")
 
@@ -20,11 +25,12 @@ ml_service = MLService()
 artifact_store = ArtifactStore()
 workspace_manager = WorkspaceManager()
 report_generator = IntegratedReportGenerator()
+visualization_service = VisualizationService()
 
 # Request Models
 class CompilerAnalysisRequest(BaseModel):
     source_code: str
-    file_name: str = "Source.java"
+    file_name: str = "SoftwareRiskAnalyzer.java"
     save_artifact: bool = True
 
 class GrammarAnalysisRequest(BaseModel):
@@ -34,6 +40,10 @@ class GrammarAnalysisRequest(BaseModel):
 
 class ProjectAnalysisRequest(BaseModel):
     files: List[Dict[str, str]]
+
+class ProjectZipUploadRequest(BaseModel):
+    zip_base64: str
+    file_name: Optional[str] = "project.zip"
 
 class MLTrainRequest(BaseModel):
     csv_text: str
@@ -116,6 +126,66 @@ def analyze_project(req: ProjectAnalysisRequest):
         raise HTTPException(status_code=400, detail="Project file list cannot be empty.")
     res = project_analyzer.analyze_project(req.files)
     return res
+
+@router.post("/compiler/project/upload-zip")
+def upload_project_zip(req: ProjectZipUploadRequest):
+    if not req.zip_base64.strip():
+        raise HTTPException(status_code=400, detail="ZIP archive payload cannot be empty.")
+
+    b64_str = req.zip_base64
+    if "," in b64_str:
+        b64_str = b64_str.split(",", 1)[1]
+
+    try:
+        raw_bytes = base64.b64decode(b64_str)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid base64 encoding: {str(e)}")
+
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(raw_bytes))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read ZIP archive: {str(e)}")
+
+    SUPPORTED_EXTS = {'.java', '.c', '.cpp', '.h', '.hpp', '.js', '.ts', '.txt', '.py'}
+    extracted_files = []
+
+    for name in zf.namelist():
+        # Skip folders, macOS metadata, hidden files
+        if name.endswith('/') or name.startswith('__MACOSX/') or '/.' in name or name.startswith('.'):
+            continue
+        ext = '.' + name.split('.')[-1].lower() if '.' in name else ''
+        if ext in SUPPORTED_EXTS:
+            try:
+                data = zf.read(name)
+                try:
+                    text = data.decode('utf-8')
+                except UnicodeDecodeError:
+                    text = data.decode('latin-1', errors='replace')
+
+                clean_name = name.split('/')[-1] if '/' in name else name
+                extracted_files.append({
+                    "file_name": clean_name,
+                    "relative_path": name,
+                    "source_code": text
+                })
+            except Exception:
+                continue
+
+    if not extracted_files:
+        raise HTTPException(
+            status_code=400,
+            detail="No supported source code files (.java, .c, .cpp, .ts, etc.) were found inside this ZIP archive."
+        )
+
+    res = project_analyzer.analyze_project(extracted_files)
+    proj_name = req.file_name or "UploadedProject.zip"
+    res["project_name"] = proj_name
+    res["zip_filename"] = proj_name
+    return {
+        "project_name": proj_name,
+        "files": extracted_files,
+        "analysis": res
+    }
 
 @router.get("/compiler/export/{artifact_id}/{export_format}")
 def export_compiler_artifact(artifact_id: str, export_format: str):
@@ -229,6 +299,11 @@ def export_ml_artifact(artifact_id: str):
 def list_artifacts(artifact_type: Optional[str] = None):
     return {"artifacts": artifact_store.list_artifacts(artifact_type)}
 
+@router.delete("/artifacts")
+def clear_artifacts():
+    artifact_store.clear()
+    return {"status": "cleared", "count": 0}
+
 @router.get("/artifacts/{artifact_id}")
 def get_artifact(artifact_id: str):
     art = artifact_store.get_artifact(artifact_id)
@@ -267,6 +342,17 @@ def generate_report(req: ReportRequest):
         title=req.title
     )
     return rep
+
+@router.post("/reports/pdf")
+def generate_pdf_report(req: ReportRequest):
+    comp_art = artifact_store.get_artifact(req.compiler_artifact_id) if req.compiler_artifact_id else None
+    if not comp_art or comp_art.get("artifact_type") != "compiler_analysis":
+        raise HTTPException(status_code=404, detail="Compiler analysis artifact not found for PDF generation.")
+
+    from app.reports.pdf_generator import CompilerPDFReportGenerator
+    pdf_gen = CompilerPDFReportGenerator()
+    pdf_bytes = pdf_gen.generate_pdf(comp_art["payload"], title=req.title or "Compiler Intelligence Report")
+    return Response(content=pdf_bytes, media_type="application/pdf", headers={"Content-Disposition": "attachment; filename=CodePulse_Compiler_Report.pdf"})
 
 # --- Academic Mapping Endpoint ---
 @router.get("/academic/mapping")
@@ -329,3 +415,197 @@ def get_academic_mappings():
             }
         ]
     }
+
+# --- Visualization Request Models ---
+class VisualProfileRequest(BaseModel):
+    dataset_content: Optional[str] = None
+    dataset: Optional[List[Dict[str, Any]]] = None
+    columns: Optional[List[str]] = None
+    file_type: str = "csv"
+    dataset_name: str = "Uploaded Dataset"
+
+class VisualAnomalyRequest(BaseModel):
+    dataset_content: Optional[str] = None
+    dataset: Optional[List[Dict[str, Any]]] = None
+    columns: Optional[List[str]] = None
+    method: str = "iqr"
+
+class VisualTimeSeriesRequest(BaseModel):
+    dataset_content: Optional[str] = None
+    dataset: Optional[List[Dict[str, Any]]] = None
+    date_column: str
+    value_column: str
+    frequency: str = "D"
+
+class VisualHierarchyRequest(BaseModel):
+    dataset_content: Optional[str] = None
+    dataset: Optional[List[Dict[str, Any]]] = None
+    hierarchy_columns: List[str]
+    value_column: Optional[str] = None
+
+class VisualStoryRequest(BaseModel):
+    dataset_content: Optional[str] = None
+    dataset: Optional[List[Dict[str, Any]]] = None
+    columns: Optional[List[str]] = None
+    compiler_data: Optional[Dict[str, Any]] = None
+
+class VisualQueryRequest(BaseModel):
+    query_text: str
+    artifact_id: Optional[str] = None
+    dataset: Optional[List[Dict[str, Any]]] = None
+    numeric_columns: Optional[List[str]] = None
+    compiler_data: Optional[Dict[str, Any]] = None
+
+class VisualExperimentExecuteRequest(BaseModel):
+    experiment_id: str
+    sample_csv: Optional[str] = None
+
+def _extract_visualization_dataframe(req: Any) -> pd.DataFrame:
+    if getattr(req, "dataset", None) is not None and len(req.dataset) > 0:
+        return pd.DataFrame(req.dataset)
+    if getattr(req, "dataset_content", None) is not None and req.dataset_content.strip():
+        file_type = getattr(req, "file_type", "csv")
+        return visualization_service.parse_dataset(req.dataset_content, file_type)
+    raise ValueError("Neither dataset list nor dataset_content was provided.")
+
+# --- Visualization Intelligence Endpoints ---
+@router.post("/visualization/profile")
+def profile_visualization_dataset(req: VisualProfileRequest):
+    try:
+        df = _extract_visualization_dataframe(req)
+        profile = visualization_service.profile_dataset(df, req.dataset_name)
+        recommendations = visualization_service.recommend_visualizations(profile)
+        correlations = visualization_service.compute_correlation_matrix(df)
+        anomalies = visualization_service.detect_anomalies(df)
+        story = visualization_service.generate_visual_story(profile_data=profile)
+        return {
+            "profile": profile,
+            "recommendations": recommendations,
+            "correlations": correlations,
+            "anomalies": anomalies,
+            "story": story
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/visualization/recommendations")
+def recommend_visualizations(req: VisualProfileRequest):
+    try:
+        df = _extract_visualization_dataframe(req)
+        profile = visualization_service.profile_dataset(df, req.dataset_name)
+        recs = visualization_service.recommend_visualizations(profile)
+        return {"recommendations": recs}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/visualization/correlation")
+def analyze_correlation(req: VisualProfileRequest):
+    try:
+        df = _extract_visualization_dataframe(req)
+        if req.columns:
+            valid_cols = [c for c in req.columns if c in df.columns]
+            if len(valid_cols) >= 2:
+                df = df[valid_cols]
+        res = visualization_service.compute_correlation_matrix(df)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/visualization/anomalies")
+def analyze_anomalies(req: VisualAnomalyRequest):
+    try:
+        df = _extract_visualization_dataframe(req)
+        if req.columns:
+            valid_cols = [c for c in req.columns if c in df.columns]
+            if valid_cols:
+                df = df[valid_cols]
+        res = visualization_service.detect_anomalies(df, method=req.method)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/visualization/story")
+def get_visual_story(req: VisualStoryRequest):
+    try:
+        profile = None
+        if (req.dataset is not None and len(req.dataset) > 0) or (req.dataset_content and req.dataset_content.strip()):
+            df = _extract_visualization_dataframe(req)
+            profile = visualization_service.profile_dataset(df)
+        story = visualization_service.generate_visual_story(compiler_data=req.compiler_data, profile_data=profile)
+        return {"steps": story}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/visualization/time-series")
+def analyze_time_series(req: VisualTimeSeriesRequest):
+    try:
+        df = _extract_visualization_dataframe(req)
+        res = visualization_service.analyze_time_series(df, req.date_column, req.value_column, req.frequency)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/visualization/hierarchy")
+def analyze_hierarchy(req: VisualHierarchyRequest):
+    try:
+        df = _extract_visualization_dataframe(req)
+        res = visualization_service.generate_hierarchy_data(df, req.hierarchy_columns, req.value_column)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/visualization/lineage")
+def get_artifact_lineage():
+    arts = artifact_store.list_artifacts()
+    res = visualization_service.build_artifact_lineage_graph(arts)
+    return res
+
+@router.post("/visualization/query")
+def parse_visual_query(req: VisualQueryRequest):
+    if not req.query_text or not req.query_text.strip():
+        raise HTTPException(status_code=400, detail="Query text cannot be empty.")
+    try:
+        compiler_data = req.compiler_data
+        if compiler_data is None and req.artifact_id:
+            art = artifact_store.get_artifact(req.artifact_id)
+            if art and art.get("artifact_type") == "compiler_analysis":
+                compiler_data = art.get("payload")
+        if compiler_data is None:
+            comp_arts = artifact_store.list_artifacts("compiler_analysis")
+            if comp_arts:
+                compiler_data = comp_arts[0].get("payload")
+
+        dataset = req.dataset
+        if dataset is None:
+            data_arts = artifact_store.list_artifacts("data_profile")
+            if not data_arts:
+                data_arts = artifact_store.list_artifacts("dataset_profile")
+            if data_arts and "dataset" in data_arts[0].get("payload", {}):
+                dataset = data_arts[0]["payload"]["dataset"]
+
+        res = visualization_service.parse_visual_query(
+            query_text=req.query_text,
+            compiler_data=compiler_data,
+            dataset=dataset,
+            numeric_columns=req.numeric_columns
+        )
+        return res
+    except HTTPException:
+        raise
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/visualization/experiments")
+def get_lab_experiments():
+    return {"experiments": visualization_service.get_lab_experiments()}
+
+@router.post("/visualization/experiments/execute")
+def execute_lab_experiment(req: VisualExperimentExecuteRequest):
+    try:
+        res = visualization_service.execute_lab_experiment(req.experiment_id, req.sample_csv)
+        return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+

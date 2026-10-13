@@ -14,6 +14,9 @@ class ArtifactStore:
     def __init__(self):
         self._artifacts: Dict[str, Dict[str, Any]] = {}
 
+    def clear(self) -> None:
+        self._artifacts.clear()
+
     def create_artifact(
         self,
         artifact_type: str,
@@ -100,6 +103,12 @@ class ArtifactStore:
 
             zip_buffer.seek(0)
             return {"content_type": "application/zip", "filename": "compiler_artifacts.zip", "bytes": zip_buffer.getvalue()}
+
+        elif export_format in ("pdf", "pdf_report"):
+            from app.reports.pdf_generator import CompilerPDFReportGenerator
+            pdf_gen = CompilerPDFReportGenerator()
+            pdf_bytes = pdf_gen.generate_pdf(payload, title=compiler_artifact.get("title", "Compiler Intelligence Report"))
+            return {"content_type": "application/pdf", "filename": "compiler_report.pdf", "bytes": pdf_bytes}
 
         return {"content_type": "application/json", "filename": "compiler_analysis.json", "data": json.dumps(payload, indent=2)}
 

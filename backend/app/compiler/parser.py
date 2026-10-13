@@ -18,6 +18,7 @@ class Parser:
         self.tokens = tokens
         self.pos = 0
         self.diagnostics: List[dict] = []
+        self.suppress_eof_cascade = False
 
     def current_token(self) -> Token:
         if self.pos < len(self.tokens):
@@ -48,6 +49,9 @@ class Parser:
         tok = self.current_token()
         if tok.type == t_type and (val is None or tok.value == val):
             return self.advance()
+
+        if self.suppress_eof_cascade and tok.type == TokenType.EOF:
+            return tok
         
         err_msg = msg or f"Expected {val or t_type.value}, but found '{tok.value}'"
         self.diagnostics.append({
@@ -59,6 +63,18 @@ class Parser:
         })
         # Synchronize token stream
         return tok
+
+    def add_syntax_error_once(self, message: str, line: int, column: int) -> None:
+        for diag in self.diagnostics:
+            if diag["phase"] == "Syntax Analysis" and diag["message"] == message and diag["line"] == line:
+                return
+        self.diagnostics.append({
+            "severity": "error",
+            "phase": "Syntax Analysis",
+            "message": message,
+            "line": line,
+            "column": column
+        })
 
     def parse(self) -> Tuple[ProgramNode, List[dict]]:
         self.diagnostics = []
@@ -296,7 +312,23 @@ class Parser:
         line = self.current_token().line
         col = self.current_token().column
         self.advance() # while
+        if self.current_token().type == TokenType.EOF:
+            self.suppress_eof_cascade = True
+            self.add_syntax_error_once(
+                "Incomplete while statement. Expected: while (<condition>) { ... }. Found EOF.",
+                line,
+                col
+            )
+            return WhileNode(LiteralNode(0, "int", line, col), BlockNode([], line, col), line, col)
         self.expect(TokenType.DELIMITER, "(")
+        if self.current_token().type == TokenType.EOF:
+            self.suppress_eof_cascade = True
+            self.add_syntax_error_once(
+                "Incomplete while statement. Expected condition after 'while ('. Found EOF.",
+                line,
+                col
+            )
+            return WhileNode(LiteralNode(0, "int", line, col), BlockNode([], line, col), line, col)
         cond = self.parse_expression()
         self.expect(TokenType.DELIMITER, ")")
         body = self.parse_statement() or BlockNode([])

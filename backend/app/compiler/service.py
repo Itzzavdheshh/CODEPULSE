@@ -2,6 +2,7 @@ from typing import Dict, Any, List
 from .preprocessor import Preprocessor
 from .lexer import Lexer
 from .parser import Parser
+from .ast import count_ast_nodes
 from .semantic import SemanticAnalyzer
 from .ir import IRGenerator
 from .optimizer import TACOptimizer
@@ -27,7 +28,9 @@ class CompilerService:
 
         # 2. Lexical Analysis
         lexer = Lexer(clean_code)
-        tokens, lex_diagnostics = lexer.tokenize()
+        raw_tokens, lex_diagnostics = lexer.tokenize()
+        tokens = [t for t in raw_tokens if t.type != "EOF"]
+        token_count = len(tokens)
 
         # Keyword Frequency Analysis
         keyword_freq: Dict[str, int] = {}
@@ -36,7 +39,7 @@ class CompilerService:
                 keyword_freq[t.value] = keyword_freq.get(t.value, 0) + 1
 
         # 3. Syntax Analysis & AST Construction
-        parser = Parser(tokens)
+        parser = Parser(raw_tokens)
         ast, parse_diagnostics = parser.parse()
 
         # 4. Semantic Analysis & Hierarchical Symbol Table
@@ -49,7 +52,7 @@ class CompilerService:
 
         # 6. Optimization (Constant Folding & Dead Code Elimination)
         optimizer = TACOptimizer()
-        opt_quads, opt_transformations = optimizer.optimize(tac_quads)
+        opt_quads, opt_transformations, opt_audit = optimizer.optimize(tac_quads)
 
         # 7. Basic Blocks & CFG Generation
         cfg_builder = CFGBuilder()
@@ -65,10 +68,15 @@ class CompilerService:
         # Combine diagnostics
         all_diagnostics = lex_diagnostics + parse_diagnostics + sem_diagnostics
 
+        total_ast_nodes = count_ast_nodes(ast)
+        metrics["ast_nodes_count"] = total_ast_nodes
+        metrics["tokens_count"] = token_count
+
         stats = {
             "lines": len(source_code.split('\n')),
             "characters": len(source_code),
-            "tokens_count": len(tokens),
+            "tokens_count": token_count,
+            "ast_nodes_count": total_ast_nodes,
             "keywords_count": metrics["keywords_count"],
             "identifiers_count": metrics["identifiers_count"],
             "diagnostics_count": len(all_diagnostics),
@@ -82,18 +90,16 @@ class CompilerService:
             "stats": stats,
             "preprocessing": prep_data,
             "keyword_frequency": keyword_freq,
-            "tokens": [t.to_dict() for t in tokens if t.type != "EOF"],
+            "tokens": [t.to_dict() for t in tokens],
             "ast": ast.to_dict(),
             "symbol_table": symbols,
             "diagnostics": all_diagnostics,
             "intermediate_code": tac_quads,
             "optimized_code": opt_quads,
             "optimization_transformations": opt_transformations,
+            "optimization_audit": opt_audit,
             "basic_blocks": cfg_data.get("blocks", []),
-            "cfg": {
-                "nodes": cfg_data.get("nodes", []),
-                "edges": cfg_data.get("edges", [])
-            },
+            "cfg": cfg_data,
             "target_code": target_code,
             "metrics": metrics
         }

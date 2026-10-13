@@ -4,7 +4,7 @@ class GrammarAnalyzer:
     """
     Compiler Design Grammar Analysis & Parsing Toolkit.
     Provides FIRST/FOLLOW sets calculation, Direct Left-Recursion detection & elimination,
-    Recursive Descent trace simulation, and Shift-Reduce parsing step simulation.
+    Recursive Descent trace simulation, and Shift-Reduce parsing step simulation with conflict detection.
     """
     
     def analyze_grammar(self, productions_input: Dict[str, List[str]] = None) -> Dict[str, Any]:
@@ -178,24 +178,51 @@ class GrammarAnalyzer:
 
     def simulate_recursive_descent(self, input_string: str = "c a b d") -> Dict[str, Any]:
         """
-        Simulates recursive descent parsing for grammar: S -> c A d, A -> a b | a
+        Simulates recursive descent parsing for grammar: S -> c A d, A -> a b | a.
+        Records production_selected, lookahead, consumed_token, step, and action.
         """
         tokens = input_string.split()
         pos = 0
         trace = []
 
+        def current_lookahead() -> str:
+            return tokens[pos] if pos < len(tokens) else "<EOF>"
+
         def match(tok: str) -> bool:
             nonlocal pos
+            lh = current_lookahead()
             if pos < len(tokens) and tokens[pos] == tok:
-                trace.append({"step": len(trace) + 1, "action": f"MATCH '{tok}'", "input_remaining": " ".join(tokens[pos:])})
+                trace.append({
+                    "step": len(trace) + 1,
+                    "action": f"MATCH '{tok}'",
+                    "production_selected": None,
+                    "lookahead": lh,
+                    "consumed_token": tok,
+                    "input_remaining": " ".join(tokens[pos+1:])
+                })
                 pos += 1
                 return True
-            trace.append({"step": len(trace) + 1, "action": f"FAIL MATCH '{tok}' (found '{tokens[pos] if pos < len(tokens) else '<EOF>'}')", "input_remaining": " ".join(tokens[pos:])})
+            trace.append({
+                "step": len(trace) + 1,
+                "action": f"FAIL MATCH '{tok}' (found '{lh}')",
+                "production_selected": None,
+                "lookahead": lh,
+                "consumed_token": None,
+                "input_remaining": " ".join(tokens[pos:])
+            })
             return False
 
         def parse_A() -> bool:
             nonlocal pos
-            trace.append({"step": len(trace) + 1, "action": "EXPAND A -> a b | a", "input_remaining": " ".join(tokens[pos:])})
+            lh = current_lookahead()
+            trace.append({
+                "step": len(trace) + 1,
+                "action": "EXPAND A -> a b | a",
+                "production_selected": "A -> a b | a",
+                "lookahead": lh,
+                "consumed_token": None,
+                "input_remaining": " ".join(tokens[pos:])
+            })
             saved_pos = pos
             if match("a"):
                 if pos < len(tokens) and tokens[pos] == "b":
@@ -207,7 +234,15 @@ class GrammarAnalyzer:
             return False
 
         def parse_S() -> bool:
-            trace.append({"step": len(trace) + 1, "action": "EXPAND S -> c A d", "input_remaining": " ".join(tokens[pos:])})
+            lh = current_lookahead()
+            trace.append({
+                "step": len(trace) + 1,
+                "action": "EXPAND S -> c A d",
+                "production_selected": "S -> c A d",
+                "lookahead": lh,
+                "consumed_token": None,
+                "input_remaining": " ".join(tokens[pos:])
+            })
             if match("c"):
                 if parse_A():
                     if match("d"):
@@ -225,16 +260,19 @@ class GrammarAnalyzer:
     def simulate_shift_reduce(self, input_string: str = "i + i * i") -> Dict[str, Any]:
         """
         Simulates Shift-Reduce parsing for expression grammar: E -> E + E | E * E | i
+        Includes Shift-Reduce and Reduce-Reduce conflict detection.
         """
         tokens = input_string.split() + ["$"]
         stack = ["$"]
         pos = 0
         steps = []
+        conflicts = []
         step_num = 1
 
         while True:
             stack_str = " ".join(stack)
             input_str = " ".join(tokens[pos:])
+            next_tok = tokens[pos] if pos < len(tokens) else "$"
 
             # Check Reduce: TOS is 'i' -> E -> i
             if stack[-1] == "i":
@@ -244,20 +282,30 @@ class GrammarAnalyzer:
                 step_num += 1
                 continue
 
-            # Check Reduce: E + E -> E or E * E -> E
+            # Check Reduce & Shift-Reduce conflict on binary operations E op E
             if len(stack) >= 3 and stack[-3] == "E" and stack[-1] == "E":
                 op = stack[-2]
-                next_tok = tokens[pos] if pos < len(tokens) else "$"
-                
-                # Precedence check for * vs +
-                if op == "*" or (op == "+" and next_tok != "*"):
-                    stack.pop() # E
-                    stack.pop() # op
-                    stack.pop() # E
-                    stack.append("E")
-                    steps.append({"step": step_num, "stack": stack_str, "input": input_str, "action": f"REDUCE E -> E {op} E"})
-                    step_num += 1
-                    continue
+                if op in ("+", "*"):
+                    # Shift-Reduce Conflict Detection:
+                    # When stack ends with E op E and next token is an operator (+ or *),
+                    # both SHIFT (next_tok) and REDUCE (E -> E op E) are syntactically valid LR actions.
+                    if next_tok in ("+", "*"):
+                        conflict_msg = (
+                            f"Shift/Reduce Conflict at step {step_num} (Stack: [{stack_str}], Lookahead: '{next_tok}'): "
+                            f"Ambiguity between SHIFT '{next_tok}' and REDUCE 'E -> E {op} E'"
+                        )
+                        if conflict_msg not in conflicts:
+                            conflicts.append(conflict_msg)
+
+                    # Precedence check for * vs +
+                    if op == "*" or (op == "+" and next_tok != "*"):
+                        stack.pop() # E
+                        stack.pop() # op
+                        stack.pop() # E
+                        stack.append("E")
+                        steps.append({"step": step_num, "stack": stack_str, "input": input_str, "action": f"REDUCE E -> E {op} E"})
+                        step_num += 1
+                        continue
 
             # Check Accept
             if stack == ["$", "E"] and tokens[pos] == "$":
@@ -266,7 +314,8 @@ class GrammarAnalyzer:
                     "input": input_string,
                     "success": True,
                     "steps": steps,
-                    "conflicts": []
+                    "has_conflicts": len(conflicts) > 0,
+                    "conflicts": conflicts
                 }
 
             # Shift next token
@@ -282,5 +331,6 @@ class GrammarAnalyzer:
                     "input": input_string,
                     "success": False,
                     "steps": steps,
-                    "conflicts": ["Syntax Error: Unmatched input token buffer or reduction impasse"]
+                    "has_conflicts": True,
+                    "conflicts": conflicts + ["Syntax Error: Unmatched input token buffer or reduction impasse"]
                 }
